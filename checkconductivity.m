@@ -1,0 +1,1 @@
+thermal_conductivity_Al10SiMg(ones(5,5)*5)
