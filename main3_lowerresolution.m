@@ -13,7 +13,7 @@ set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 
 format long
 
-I0 = 4500 ;                    % Driving current (A) 
+I0 = 4500 ;                    % Driving current (A)  test
 tHeater = 5; %[s]
 RHeater = 350; %[Ohm]
 VHeater = 32; %V
