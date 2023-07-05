@@ -16,7 +16,7 @@ format long
 I0 = 4431;                    % Driving current (A)  test2Anna
 tHeater = 2; %[s]
 RHeater = 350; %[Ohm]
-VHeater = 32; %V
+VHeater = 80; %V
 %Vheater = 80;
 PHeater = VHeater.^2/RHeater;
 %PHeater = 18; %[W]
@@ -317,7 +317,8 @@ for iterationIndex = 1:maxIteration
 
     maxTemparray = max(temperatureArray,[],2); %always get the highest temperature in the finer temperature scale
     IcArray = N_tapes*tapewidth*1e3*SCthickness*1e3*parametrisation_fujikura(BArray(1:length(temperatureArray)),maxTemparray,theta_angleArray(1:length(temperatureArray)));
-
+    IcArray(1:round(length(IcArray)/5)) = 15000;
+    IcArray(round(4*length(IcArray)/5):end) = 15000;
     IcArrayhistory(:,iterationIndex) = IcArray;
 
 
