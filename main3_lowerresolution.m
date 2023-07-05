@@ -13,6 +13,10 @@ set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 
 format long
 
+%Physical constants
+kb = 1.38064E-23; %[J/k] Boltzmann constant
+elementary_charge = 1.60217663E-19; %[C] elementary charge
+
 I0 = 4500 ;                    % Driving current (A)  test2Anna
 tHeater = 5; %[s]
 RHeater = 350; %[Ohm]
@@ -93,7 +97,7 @@ SCthickness = 2.2E-6; %[m]
 
 % ***** Look up tables ***** 
 Tinitialise = 0.1:0.1:400;
-L = 2.44E-8; %[V^2K^-2]
+L = pi.^2/3*(kb/elementary_charge)^2; %[V^2K^-2] bloch gruneisen parameter: Lorentz ratio
 %ktable = 1E6.*Tinitialise.*L./BlochGrun(Tinitialise,0.2594,484,0.026,5);
 %rhotable = BlochGrun(Tinitialise,0.2594,484,0.026,5)/1E6;
  %BlochGrun(x,A,thetaR,z,n)
