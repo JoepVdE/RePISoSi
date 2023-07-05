@@ -1,4 +1,4 @@
-function [] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
+function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
     x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
     temperatureArray, mutualInductanceSpaceRatio, IArray) 
     % drawFieldMap is a script relying on the parameters specified in run
@@ -164,6 +164,22 @@ function [] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, nu
                 w(indexy, indexx, :) = BPoints(:, 6);
             end
         end
+
+
+        % ***** Center B ***** 
+        indexx = 1;
+        indexy = round(numPointsFieldMap/2);
+        xPointArray = squeeze(x(indexy, indexx, :));
+        yPointArray = squeeze(y(indexy, indexx, :));
+        zPointArray = squeeze(z(indexy, indexx, :));
+
+        centerB_temp = calcPoints(numFieldPoints, numLines, xPointArray, yPointArray, zPointArray, ... 
+            xMidArray, yMidArray, zMidArray, xDiffArray, yDiffArray, zDiffArray, lenArray, IArray, ... 
+            mutualInductanceSpaceRatio); 
+        centerB = centerB_temp(round(length(centerB_temp)/2), 6);
+        % ***** Center B ***** 
+
+
 
         norm = sqrt(u.^2 + v.^2 + w.^2); 
         colormap(jet); 

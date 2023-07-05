@@ -13,12 +13,8 @@ set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 
 format long
 
-%Physical constants
-kb = 1.38064E-23; %[J/k] Boltzmann constant
-elementary_charge = 1.60217663E-19; %[C] elementary charge
-
-I0 = 4500 ;                    % Driving current (A)  test2Anna
-tHeater = 5; %[s]
+I0 = 4431;                    % Driving current (A)  test2Anna
+tHeater = 2; %[s]
 RHeater = 350; %[Ohm]
 VHeater = 32; %V
 %Vheater = 80;
@@ -97,7 +93,7 @@ SCthickness = 2.2E-6; %[m]
 
 % ***** Look up tables ***** 
 Tinitialise = 0.1:0.1:400;
-L = pi.^2/3*(kb/elementary_charge)^2; %[V^2K^-2] bloch gruneisen parameter: Lorentz ratio
+L = 2.44E-8; %[V^2K^-2]
 %ktable = 1E6.*Tinitialise.*L./BlochGrun(Tinitialise,0.2594,484,0.026,5);
 %rhotable = BlochGrun(Tinitialise,0.2594,484,0.026,5)/1E6;
  %BlochGrun(x,A,thetaR,z,n)
@@ -216,6 +212,11 @@ Nu = 4.36; %Nusselt number for steady laminar pipe flow
 
 volumeArray = (lenArray(1:numLinesAlongWire)./numThermalSubdivisions ... 
     .*thCond*wCond)*ones(1, numThermalSubdivisions);
+Acylinder = 2*2*pi*RSol*(wCond-heightSlot)*numWindings;
+Aslots = 2*numTransverse*arclengthSlot*thWallatShort;
+
+Atotal = Acylinder+Aslots;
+cooling_area_correction_factor = Atotal/Acylinder;
 
 
 
@@ -422,7 +423,7 @@ for iterationIndex = 1:maxIteration
 
         R_thermal = 0.5*thCond./(thermalConductivityArray)+1./h_helium_array; %Thermal resistance, including heat conductivity
         
-        Qheliumcoolingarray = 2.*A_helium.*(temperatureArray-temperature_helium)./R_thermal; %(area from 2 sides)
+        Qheliumcoolingarray = 2.*cooling_area_correction_factor*A_helium.*(temperatureArray-temperature_helium)./R_thermal; %(area from 2 sides)
          
         % 
         % QElementArray_temp(1:resolution:numTransverse*resolution,round(size(temperatureArray,2)/2)) = QElementArray_temp(1:resolution:numTransverse*resolution,round(size(temperatureArray,2)/2)) + Qaxialarray; %add heat flow for bottom part sign convention 
@@ -528,12 +529,13 @@ for iterationIndex = 1:maxIteration
     BLocalZArray = BiotSavartMatrixZ*IArray; 
 
     if(mod(iterationIndex,drawFigureAtIteration) == 0)
-        drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
+        centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
             x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
             temperatureArray, mutualInductanceSpaceRatio, IArray); 
         title(sprintf('Iteration = %0.0f, t = %0.3g s, I_{ext} = %0.2f A', iterationIndex, t, IExt));
         pause(0.1) 
     end 
+    centerBhistory(iterationIndex) = centerB;
 end 
 
     
