@@ -12,7 +12,7 @@ set(0, 'defaultTextFontName', 'times', 'defaultTextFontSize', 14);
 set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 
 format long
-
+HTStapeName = 'Fujikura'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2Anna
 tHeater = 2; %[s]
 RHeater = 350; %[Ohm]
@@ -343,8 +343,25 @@ for iterationIndex = 1:maxIteration
         BArray(round(1+4*length(RNormalArray)/5):round(length(RNormalArray))),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
 
 
+
     IAbsArray = abs(IArray(1:numLinesAlongWire))*ones(1, numThermalSubdivisions); % Total current (A)
-    INormalArray = IAbsArray - IcArray;               % Critical state model
+    E0 = 100*1E-6; %[V/m] critical E-field convention
+    u0_array = E0.*lenArrayAlongWire(1:numLinesAlongWire); %[V] critical voltage over element following from Efield convention
+    n_value_array = n_value(maxTemparray,HTStapeName);
+
+    
+  
+
+%x = zeros(10,1);
+%parfor
+
+for n_index = 1:numLinesAlongWire
+    fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IAbsArray(n_index) - x).*RNormalArray(n_index));
+    x = fminsearch(fun,4000);
+ISCArray(n_index,1) = x; %amount of current in superconductor for equal voltage [A]
+end
+
+    INormalArray = IAbsArray - ISCArray;               % Critical state model
     INormalArray = INormalArray.*(INormalArray > 0);  % Current element (I)  
     VElementArray = INormalArray.*RNormalArray;       % Voltage element (V)
     PElementArray = VElementArray.*IAbsArray;         % Heating power element (W = J/s)

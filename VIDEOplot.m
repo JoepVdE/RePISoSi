@@ -5,7 +5,7 @@ figure(2)
    s3 = ' s';
 
 
-v = VideoWriter('IArrayhistoryaxialincludingcopperheliumcoolingandaxialresistanceheating2_including1and5turn.mp4','MPEG-4');
+v = VideoWriter('IArrayhistoryaxialincludingcopperheliumcoolingandaxialresistanceheating2_including1and5turnandpowerlaw.mp4','MPEG-4');
 v.FrameRate = 5;
 open(v);
 
