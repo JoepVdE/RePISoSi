@@ -5,8 +5,8 @@ figure(2)
    s3 = ' s';
 
 
-v = VideoWriter('IArrayhistoryaxialincludingcopperheliumcoolingandaxialresistanceheating2.mp4','MPEG-4');
-v.FrameRate = 10;
+v = VideoWriter('IArrayhistoryaxialincludingcopperheliumcoolingandaxialresistanceheating2_including1and5turn.mp4','MPEG-4');
+v.FrameRate = 5;
 open(v);
 
 for k = 1:size(IArrayhistory,2)

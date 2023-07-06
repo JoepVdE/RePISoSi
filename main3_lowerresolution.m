@@ -67,27 +67,26 @@ NRings = 2;
 DouterLead = 0.307; %diameter in meter
 DinnerLead = 0.208;
 
+
 ARing = pi*(DouterLead^2-DinnerLead^2)/4; %[m^2]
 
 thRing = 0.01; %[m] thickness copper current lead
+
+crossSectionRing = thRing*(DouterLead-DinnerLead); %[m^2]
 rhoCopper = 8960;  %[kg/m^3]
 
 massRing = ARing*thRing*rhoCopper; %[kg]
 temperatureRing = initial_temperature; %[K]
 
+RingRRR = 160; %[-] Ekin for annealed OFE copper. Normal copper RRR~110, not ennealed OFE RRR~45
 % ***** Superconducting cable properties ***** 
+
+
+
+
 N_tapes = 4;
 tapewidth = 4E-3; %[m]
 SCthickness = 2.2E-6; %[m]
-
-
-% Tc = 77;   % Critical temperature (K) 
-% Ic0 = 2000; % Critical current near 0 K (A) 
-% % ***** 
-
-
-
-
 
 
 
@@ -317,8 +316,8 @@ for iterationIndex = 1:maxIteration
 
     maxTemparray = max(temperatureArray,[],2); %always get the highest temperature in the finer temperature scale
     IcArray = N_tapes*tapewidth*1e3*SCthickness*1e3*parametrisation_fujikura(BArray(1:length(temperatureArray)),maxTemparray,theta_angleArray(1:length(temperatureArray)));
-    IcArray(1:round(length(IcArray)/5)) = 15000;
-    IcArray(round(4*length(IcArray)/5):end) = 15000;
+ %   IcArray(1:round(length(IcArray)/5)) = 15000;
+  %  IcArray(round(4*length(IcArray)/5):end) = 15000;
     IcArrayhistory(:,iterationIndex) = IcArray;
 
 
@@ -337,7 +336,12 @@ for iterationIndex = 1:maxIteration
     RArrayTrans = axialshortResistance;
     RArrayTrans(end+1) = RArrayTrans(end);
 
-    RNormalArray = resistivityNormalArray.*lenArrayAlongWire./(ACond.*numThermalSubdivisions);			
+    RNormalArray = resistivityNormalArray.*lenArrayAlongWire(1:numLinesAlongWire)./(ACond.*numThermalSubdivisions);			
+
+    RNormalArray(1:round(length(RNormalArray)/5),:) =         ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1),BArray(1:round(length(RNormalArray)/5)),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
+    RNormalArray(round(1+4*length(RNormalArray)/5):end,:) =     ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1), ...
+        BArray(round(1+4*length(RNormalArray)/5):round(length(RNormalArray))),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
+
 
     IAbsArray = abs(IArray(1:numLinesAlongWire))*ones(1, numThermalSubdivisions); % Total current (A)
     INormalArray = IAbsArray - IcArray;               % Critical state model
