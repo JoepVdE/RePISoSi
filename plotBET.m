@@ -57,8 +57,12 @@ ylabel('B [T]')
 
 figure(6)
 plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingBottomhistory)
+hold on
+plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingTophistory)
+
 xlabel('time [s]')
 ylabel('T [K]')
+legend('Tbottom','Ttop')
 
 
 % N = 31    ;
