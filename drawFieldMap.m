@@ -1,9 +1,8 @@
-function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
-    x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
+function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
     temperatureArray, mutualInductanceSpaceRatio, IArray) 
     % drawFieldMap is a script relying on the parameters specified in run
     % script 
-
+    figure(1)
     % Distance between the turns             
     xDiffArray = x2Array - x1Array;
     yDiffArray = y2Array - y1Array;

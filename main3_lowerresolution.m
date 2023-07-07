@@ -14,9 +14,13 @@ set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 format long
 HTStapeName = 'Fujikura'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2Anna
-tHeater = 2; %[s]
-RHeater = 350; %[Ohm]
-VHeater = 80; %V
+
+
+iterateheater = 1; 
+toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
+theater = [1.633,5.478,10.304,15.42,19.826]; %[s]   time in between heating pulses
+RHeater = 350; % resistance of heater [Ohm]
+VHeater = 80; % voltage over heater V
 %Vheater = 80;
 PHeater = VHeater.^2/RHeater;
 %PHeater = 18; %[W]
@@ -123,10 +127,14 @@ numThermalElements = (numPoints - 1)*numThermalSubdivisions;    % Total number o
 
 
 numLinesAlongWire = numPoints - 1; 
+
+dIdt = zeros(numLinesAlongWire,1); %initial dIdt
 %numTransverse = floor((numWindings - 1)*numPointsPerTurn + 1); 
 numTransverse = floor((numWindings - 1)*N_shorts + 1)-2; %TODO waarom -2? waarom loopt hij niet goed in de eerste plaats
 numTransverse = max(numTransverse, 0); 
 numLines = numLinesAlongWire + numTransverse; 
+
+IArrayTrans = zeros(numTransverse-1,1);
 
 % Generate line elements in helix form
 [xArray, yArray, zArray] = ... 
@@ -183,7 +191,7 @@ IArray(1:numLinesAlongWire) = I0; % Current is only induced along the line
 %initial_temperature = 77; % Initial temperature of 77 K
 temperatureArray = ones(numPoints - 1, numThermalSubdivisions)*initial_temperature;  
 %temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 10; % Hotspot 10 K
-temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 20; % Hotspot 100 K
+temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 20.5; % Hotspot 100 K
 
 
 % ***** Turn-to-turn resistance ***** 
@@ -227,7 +235,7 @@ IExt = I0; % External current
 
 disp('Transient calculation'); 
 
-maxIteration = 10000; % Number of iterations 
+maxIteration = 50000; % Number of iterations 
 updateCounter = floor(maxIteration/100);
 
 drawFigureAtIteration = 1; % (yes 1, no 0)
@@ -355,13 +363,25 @@ for iterationIndex = 1:maxIteration
 %x = zeros(10,1);
 %parfor
 
-for n_index = 1:numLinesAlongWire
-    fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IAbsArray(n_index) - x).*RNormalArray(n_index));
-    x = fminsearch(fun,4000);
-ISCArray(n_index,1) = x; %amount of current in superconductor for equal voltage [A]
-end
+% L_self = MArray(sub2ind(size(MArray),1:size(MArray,1),1:size(MArray,2)))'; %get self inductance from mutual inductance matrix [H]
+% 
+% RArraytrans2 = zeros(numLinesAlongWire,1);
+% RArraytrans2(1:5:numLinesAlongWire) = RArrayTrans(1:end-1);
+% 
+% 
+% IArraytrans2 = zeros(numLinesAlongWire,1);
+% IArraytrans2(1:5:numLinesAlongWire) = IArrayTrans(1:end);
+% 
+% for n_index = 1:numLinesAlongWire
+%     %fun = @(x) abs(L_self(n_index).*dIdt(n_index) + u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IAbsArray(n_index) - x).*RNormalArray(n_index));
+%     %fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IArray(n_index) - x).*RNormalArray(n_index) - (IArraytrans2(n_index) - x).*RArraytrans2(n_index));
+%     fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IArray(n_index) - x).*RNormalArray(n_index));
+% 
+%     x = fminsearch(fun,4000);
+% ISCArray(n_index,1) = x; %amount of current in superconductor for equal voltage [A]
+% end
 
-    INormalArray = IAbsArray - ISCArray;               % Critical state model
+    INormalArray = IAbsArray - IcArray;               % Critical state model
     INormalArray = INormalArray.*(INormalArray > 0);  % Current element (I)  
     VElementArray = INormalArray.*RNormalArray;       % Voltage element (V)
     PElementArray = VElementArray.*IAbsArray;         % Heating power element (W = J/s)
@@ -383,36 +403,42 @@ end
 
     halfindex = round(length(PElementArray)/2);
 
-    if t < tHeater %seconds
-    PElementArray(halfindex,:) = PElementArray(halfindex,:)+PHeater/3; %[W] Force heating
+
+
+    if toffset(1) < t && t < toffset(1) + theater(1) %heating 2s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
     end
 
 
-    if 2 < t && t < 50
-       PElementArray(halfindex,:) = 0; %[W] Force heating
+
+    toffsettemp = toffset(1) + theater(1) + toffset(2);
+
+    if toffsettemp < t && t < toffsettemp + theater(2) %heating 5s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
     end
 
 
-    if 50 < t && t < 55
-        PElementArray(halfindex,:) = PElementArray(halfindex,:)+PHeater/3; %[W] Force heating
+    toffsettemp = toffsettemp + theater(2) + toffset(3);
+
+    if toffsettemp < t && t < toffsettemp + theater(3) %heater 10s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
     end
 
+    toffsettemp = toffsettemp + theater(3) + toffset(4);
 
-    if 55 < t && t < 105
-       PElementArray(halfindex,:) = 0; %[W] Force heating
+
+    if toffsettemp < t && t < toffsettemp + theater(4) %heating 15s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
+    end
+    toffsettemp = toffsettemp + theater(4) + toffset(5);
+
+    if toffsettemp < t && t < toffsettemp + theater(5) %heating 20s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
     end
 
-    if 105 < t && t < 115
-        PElementArray(halfindex,:) = PElementArray(halfindex,:)+PHeater/3; %[W] Force heating
-    end 
+   
 
-
-    if t > 115
-        PElementArray(halfindex,:) = 0; %[W] Force heating
-    end 
-
-
-    if t> 165
+    if t> toffsettemp + theater(5)+toffset(6)
         break
     end
 
@@ -530,7 +556,6 @@ end
     temperatureRingBottomhistory(:,iterationIndex) = temperatureRingBottom;
 
     % *****
-VGr
     % Material property calculation
     timeTemperatureNext = now*24*3600; 
 
@@ -540,7 +565,7 @@ VGr
     
     s.RArrayTrans = RArrayTrans;
     s.IcArray = IcArray;   %critical current of superconductor
-    s.ISCArray = ISCArray;  %current in superocnductor
+    %s.ISCArray = ISCArray;  %current in superocnductor
     s.externalVoltagedIdtVector = s.externalVoltagedIdtVector;
     s.bVector = [];
     s.VGroundVector = [];
@@ -582,13 +607,24 @@ VGr
     BLocalZArray = BiotSavartMatrixZ*IArray; 
 
     if(mod(iterationIndex,drawFigureAtIteration) == 0)
+        hold on
         centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
             x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
             temperatureArray, mutualInductanceSpaceRatio, IArray); 
         title(sprintf('Iteration = %0.0f, t = %0.3g s, I_{ext} = %0.2f A', iterationIndex, t, IExt));
         pause(0.1) 
+        hold off
     end 
+    
+    
     centerBhistory(iterationIndex) = centerB;
+    figure(2)
+    hold off
+    plot(tArrayhistory,centerBhistory,Color='b',Marker='.',MarkerSize=10,LineStyle='-')
+    xlabel('t [s]')
+    ylabel('B_{center} [T]')
+    grid on
+    dIdt = myODE(t, IArray, s);
 end 
 
     

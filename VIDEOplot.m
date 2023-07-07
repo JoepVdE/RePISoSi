@@ -5,12 +5,12 @@ figure(2)
    s3 = ' s';
 
 
-v = VideoWriter('IArrayhistoryaxialincludingcopperheliumcoolingandaxialresistanceheating2_including1and5turnandpowerlaw.mp4','MPEG-4');
+v = VideoWriter('Iarray_ISC.mp4','MPEG-4');
 v.FrameRate = 5;
 open(v);
 
 for k = 1:size(IArrayhistory,2)
-    if tArrayhistory(k) > 165
+    if tArrayhistory(k) > 11
         break
     end
 
