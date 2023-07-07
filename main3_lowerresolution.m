@@ -13,7 +13,7 @@ set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 
 format long
 HTStapeName = 'Fujikura'; %name of tape used
-I0 = 4431;                    % Driving current (A)  test2Anna
+I0 = 4431;                    % Driving current (A)  test2AnnaJoep
 
 
 iterateheater = 1; 
