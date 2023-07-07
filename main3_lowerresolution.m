@@ -1,7 +1,7 @@
 % ***** Quench analysis of partially insulated coil *****
 % 
 %
-% Program written by M. Mentink and A. Vaskuri (Oct. 27, 2022). 
+% Program written by M. Mentink, A. Vaskuri and J.L. Van den Eijnden (Oct., 2023). 
 %
 % *****
 
@@ -227,7 +227,7 @@ IExt = I0; % External current
 
 disp('Transient calculation'); 
 
-maxIteration = 5000; % Number of iterations 
+maxIteration = 10000; % Number of iterations 
 updateCounter = floor(maxIteration/100);
 
 drawFigureAtIteration = 1; % (yes 1, no 0)
@@ -387,6 +387,36 @@ end
     PElementArray(halfindex,:) = PElementArray(halfindex,:)+PHeater/3; %[W] Force heating
     end
 
+
+    if 2 < t && t < 50
+       PElementArray(halfindex,:) = 0; %[W] Force heating
+    end
+
+
+    if 50 < t && t < 55
+        PElementArray(halfindex,:) = PElementArray(halfindex,:)+PHeater/3; %[W] Force heating
+    end
+
+
+    if 55 < t && t < 105
+       PElementArray(halfindex,:) = 0; %[W] Force heating
+    end
+
+    if 105 < t && t < 115
+        PElementArray(halfindex,:) = PElementArray(halfindex,:)+PHeater/3; %[W] Force heating
+    end 
+
+
+    if t > 115
+        PElementArray(halfindex,:) = 0; %[W] Force heating
+    end 
+
+
+    if t> 165
+        break
+    end
+
+
     timeMaterialCalculationNext = now*24*3600;
 
     % Thermal part
@@ -500,7 +530,7 @@ end
     temperatureRingBottomhistory(:,iterationIndex) = temperatureRingBottom;
 
     % *****
-
+VGr
     % Material property calculation
     timeTemperatureNext = now*24*3600; 
 
@@ -509,7 +539,8 @@ end
     % point 1, which is per definition always at 0 V. 
     
     s.RArrayTrans = RArrayTrans;
-    s.IcArray = IcArray;      
+    s.IcArray = IcArray;   %critical current of superconductor
+    s.ISCArray = ISCArray;  %current in superocnductor
     s.externalVoltagedIdtVector = s.externalVoltagedIdtVector;
     s.bVector = [];
     s.VGroundVector = [];

@@ -49,20 +49,20 @@ figure(4)
 plot(tArrayhistory(1:length(Ecoil)),Ecoil)
 xlabel('time [s]')
 ylabel('E [\muV/m]')
-
+grid on
 figure(5)
 plot(tArrayhistory(1:length(centerBhistory)),centerBhistory)
 xlabel('time [s]')
 ylabel('B [T]')
-
+grid on
 figure(6)
 plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingBottomhistory)
 hold on
 plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingTophistory)
-
+grid on
 xlabel('time [s]')
 ylabel('T [K]')
-legend('Tbottom','Ttop')
+legend('T_{bottomlead}','T_{toplead}')
 
 
 % N = 31    ;

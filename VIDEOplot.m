@@ -10,7 +10,7 @@ v.FrameRate = 5;
 open(v);
 
 for k = 1:size(IArrayhistory,2)
-    if tArrayhistory(k) > 40
+    if tArrayhistory(k) > 165
         break
     end
 
