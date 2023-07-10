@@ -13,7 +13,9 @@
 % ***** 
 function VGroundVector = myODEVoltages(t, IArray, s)
     s.signArray = sign(IArray(1:s.numLinesAlongWire));                                          % Direction of the current 
-	s.INormalArray = abs(IArray(1:s.numLinesAlongWire))*ones(1, s.numThermalSubdivisions) - s.IcArray;
+	%s.INormalArray = abs(IArray(1:s.numLinesAlongWire))*ones(1,s.numThermalSubdivisions) - s.ISCArray;  
+    s.INormalArray = abs(IArray(1:s.numLinesAlongWire))*ones(1, s.numThermalSubdivisions) - s.IcArray; %Critical state model
+
 	s.INormalArray = s.INormalArray.*(s.INormalArray > 0);                                      % Current travelling in a stabilizer (A)
 	
     voltageVectorLongitudinal = -s.signArray.*sum(s.INormalArray.*s.RNormalArray, 2);           % Voltage due to longitudial resistance of a stabilizer (ohm) 

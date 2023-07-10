@@ -24,7 +24,7 @@ VHeater = 80; % voltage over heater V
 %Vheater = 80;
 PHeater = VHeater.^2/RHeater;
 %PHeater = 18; %[W]
-dTMax = 5;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
+dTMax = 10;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
 initial_temperature = 20; % Initial temperature of 4 K
 pressure_cryostat = 0.15; %bar
 temperature_helium = initial_temperature; %[K]
@@ -225,7 +225,8 @@ Aslots = 2*numTransverse*arclengthSlot*thWallatShort;
 Atotal = Acylinder+Aslots;
 cooling_area_correction_factor = Atotal/Acylinder;
 
-
+V_local_element = zeros(numLinesAlongWire,1);
+VGroundVector = zeros(numLinesAlongWire,1);
 
 % ***** 
 
@@ -372,16 +373,19 @@ for iterationIndex = 1:maxIteration
 % IArraytrans2 = zeros(numLinesAlongWire,1);
 % IArraytrans2(1:5:numLinesAlongWire) = IArrayTrans(1:end);
 % 
+
+%V_local_element = MArray(1:numLinesAlongWire,1:numLinesAlongWire) * dIdt;
 % for n_index = 1:numLinesAlongWire
 %     %fun = @(x) abs(L_self(n_index).*dIdt(n_index) + u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IAbsArray(n_index) - x).*RNormalArray(n_index));
 %     %fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IArray(n_index) - x).*RNormalArray(n_index) - (IArraytrans2(n_index) - x).*RArraytrans2(n_index));
-%     fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IArray(n_index) - x).*RNormalArray(n_index));
+%     fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - abs((IArray(n_index) - x).*RNormalArray(n_index)) - abs(VGroundVector(n_index)));
 % 
 %     x = fminsearch(fun,4000);
 % ISCArray(n_index,1) = x; %amount of current in superconductor for equal voltage [A]
 % end
 
     INormalArray = IAbsArray - IcArray;               % Critical state model
+       % INormalArray = IAbsArray - ISCArray;               % Powerlaw
     INormalArray = INormalArray.*(INormalArray > 0);  % Current element (I)  
     VElementArray = INormalArray.*RNormalArray;       % Voltage element (V)
     PElementArray = VElementArray.*IAbsArray;         % Heating power element (W = J/s)
@@ -403,44 +407,47 @@ for iterationIndex = 1:maxIteration
 
     halfindex = round(length(PElementArray)/2);
 
-
-
-    if toffset(1) < t && t < toffset(1) + theater(1) %heating 2s
+    if  t < 1.6 %heating 2s
        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
     end
 
 
-
-    toffsettemp = toffset(1) + theater(1) + toffset(2);
-
-    if toffsettemp < t && t < toffsettemp + theater(2) %heating 5s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
-    end
-
-
-    toffsettemp = toffsettemp + theater(2) + toffset(3);
-
-    if toffsettemp < t && t < toffsettemp + theater(3) %heater 10s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-    end
-
-    toffsettemp = toffsettemp + theater(3) + toffset(4);
-
-
-    if toffsettemp < t && t < toffsettemp + theater(4) %heating 15s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-    end
-    toffsettemp = toffsettemp + theater(4) + toffset(5);
-
-    if toffsettemp < t && t < toffsettemp + theater(5) %heating 20s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-    end
-
-   
-
-    if t> toffsettemp + theater(5)+toffset(6)
-        break
-    end
+%     if toffset(1) < t && t < toffset(1) + theater(1) %heating 2s
+%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
+%     end
+% 
+% 
+% 
+%     toffsettemp = toffset(1) + theater(1) + toffset(2);
+% 
+%     if toffsettemp < t && t < toffsettemp + theater(2) %heating 5s
+%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
+%     end
+% 
+% 
+%     toffsettemp = toffsettemp + theater(2) + toffset(3);
+% 
+%     if toffsettemp < t && t < toffsettemp + theater(3) %heater 10s
+%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
+%     end
+% 
+%     toffsettemp = toffsettemp + theater(3) + toffset(4);
+% 
+% 
+%     if toffsettemp < t && t < toffsettemp + theater(4) %heating 15s
+%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
+%     end
+%     toffsettemp = toffsettemp + theater(4) + toffset(5);
+% 
+%     if toffsettemp < t && t < toffsettemp + theater(5) %heating 20s
+%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
+%     end
+% 
+%    
+% 
+%     if t> toffsettemp + theater(5)+toffset(6)
+%         break
+%     end
 
 
     timeMaterialCalculationNext = now*24*3600;
@@ -565,7 +572,7 @@ for iterationIndex = 1:maxIteration
     
     s.RArrayTrans = RArrayTrans;
     s.IcArray = IcArray;   %critical current of superconductor
-    %s.ISCArray = ISCArray;  %current in superocnductor
+    s.ISCArray = ISCArray;  %current in superocnductor
     s.externalVoltagedIdtVector = s.externalVoltagedIdtVector;
     s.bVector = [];
     s.VGroundVector = [];
@@ -595,6 +602,10 @@ for iterationIndex = 1:maxIteration
     tArrayhistory(iterationIndex) = t;
     IArrayhistory(:,iterationIndex) = IArray;
     VGroundVector = myODEVoltages(t, IArray, s);
+    V_local_element = diff(VGroundVector);
+    V_local_element(end+1) = 0;
+
+
     Qheliumcoolingarrayhistory(:,:,iterationIndex) = Qheliumcoolingarray;
     VGroundVectorhistory(:,iterationIndex) = VGroundVector;
 
