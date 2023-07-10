@@ -12,11 +12,19 @@ set(0, 'defaultTextFontName', 'times', 'defaultTextFontSize', 14);
 set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 
 format long
-HTStapeName = 'Fujikura'; %name of tape used
+HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
 
 
-iterateheater = 1; 
+Description = 'run4431AheliumcoolingallCopper';
+FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
+fileID = fopen(FileName,'w');
+
+Helium_cooling = 1; %1 is on, 0 is off.
+copper_heat = 1; %1 is on, 0 is off.
+copper_conduction = 1;%1 is on, 0 is off.
+
+
 toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
 theater = [1.633,5.478,10.304,15.42,19.826]; %[s]   time in between heating pulses
 RHeater = 350; % resistance of heater [Ohm]
@@ -24,7 +32,7 @@ VHeater = 80; % voltage over heater V
 %Vheater = 80;
 PHeater = VHeater.^2/RHeater;
 %PHeater = 18; %[W]
-dTMax = 10;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
+dTMax = 5;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
 initial_temperature = 20; % Initial temperature of 4 K
 pressure_cryostat = 0.15; %bar
 temperature_helium = initial_temperature; %[K]
@@ -234,6 +242,26 @@ IExt = I0; % External current
 %edit
 %IArray(1:numLinesAlongWire) = I0; % Initial current 
 
+fprintf(fileID,'Input Parameters RePISoSi code: \n \n');
+fprintf(fileID,'Initial Current: %.0f [A]\n', I0);
+fprintf(fileID,'Radius solenoid: %.3f [m]\n', RSol);
+fprintf(fileID,'Number of turns: %.1g [-]\n', numWindings);
+fprintf(fileID,'Number of shorts per turn: %.2g [-]\n', N_shorts);
+fprintf(fileID,'Number of line-elements between axial shorts: %.1g [-]\n', resolution);
+fprintf(fileID,'Thickness of stabiliser wall: %.2g [mm]\n', 1e3*thCond);
+fprintf(fileID,append('Tape type:',HTStapeName,'\n'));
+fprintf(fileID,'Number of tapes [-]: %.1g\n', N_tapes);
+fprintf(fileID,'Initial temperature [K]: %.1f\n', initial_temperature);
+fprintf(fileID,'Power of Heater [W]: %.1f\n', PHeater);
+fprintf(fileID,'Heating time [s]: %.1f\n', theater);
+fprintf(fileID,'deltaTmax (used for determination time step) [K]: %.1f\n', dTMax);
+fprintf(fileID,'Status Helium convection cooling (1 = on, 0 = off): %.1g\n', Helium_cooling);
+fprintf(fileID,'Status Copper heat conduction cooling (1 = on, 0 = off): %.1g\n', copper_heat);
+fprintf(fileID,'Status Copper conductivitiy (1 = on, 0 = off): %.1g\n \n \n', copper_conduction);
+
+fprintf(fileID,'time [s], centerB [T], Pheater [W], TringTop [K], TringBottom [K], Efield [uV/m], Tmax [K] \n');
+
+
 disp('Transient calculation'); 
 
 maxIteration = 50000; % Number of iterations 
@@ -346,17 +374,16 @@ for iterationIndex = 1:maxIteration
     RArrayTrans(end+1) = RArrayTrans(end);
 
     RNormalArray = resistivityNormalArray.*lenArrayAlongWire(1:numLinesAlongWire)./(ACond.*numThermalSubdivisions);			
-
+if copper_conduction == 1
     RNormalArray(1:round(length(RNormalArray)/5),:) =         ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1),BArray(1:round(length(RNormalArray)/5)),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
     RNormalArray(round(1+4*length(RNormalArray)/5):end,:) =     ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1), ...
         BArray(round(1+4*length(RNormalArray)/5):round(length(RNormalArray))),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
-
-
+end
 
     IAbsArray = abs(IArray(1:numLinesAlongWire))*ones(1, numThermalSubdivisions); % Total current (A)
-    E0 = 100*1E-6; %[V/m] critical E-field convention
-    u0_array = E0.*lenArrayAlongWire(1:numLinesAlongWire); %[V] critical voltage over element following from Efield convention
-    n_value_array = n_value(maxTemparray,HTStapeName);
+    %E0 = 100*1E-6; %[V/m] critical E-field convention
+    %u0_array = E0.*lenArrayAlongWire(1:numLinesAlongWire); %[V] critical voltage over element following from Efield convention
+    %n_value_array = n_value(maxTemparray,HTStapeName);
 
     
   
@@ -407,47 +434,52 @@ for iterationIndex = 1:maxIteration
 
     halfindex = round(length(PElementArray)/2);
 
-    if  t < 1.6 %heating 2s
+    % if  t < 1.6 %heating 2s
+    %    PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
+    % end
+
+    Pheatersave = 0;
+    if toffset(1) < t && t < toffset(1) + theater(1) %heating 2s
        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
+       Pheatersave = PHeater;
     end
 
 
-%     if toffset(1) < t && t < toffset(1) + theater(1) %heating 2s
-%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
-%     end
-% 
-% 
-% 
-%     toffsettemp = toffset(1) + theater(1) + toffset(2);
-% 
-%     if toffsettemp < t && t < toffsettemp + theater(2) %heating 5s
-%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
-%     end
-% 
-% 
-%     toffsettemp = toffsettemp + theater(2) + toffset(3);
-% 
-%     if toffsettemp < t && t < toffsettemp + theater(3) %heater 10s
-%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-%     end
-% 
-%     toffsettemp = toffsettemp + theater(3) + toffset(4);
-% 
-% 
-%     if toffsettemp < t && t < toffsettemp + theater(4) %heating 15s
-%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-%     end
-%     toffsettemp = toffsettemp + theater(4) + toffset(5);
-% 
-%     if toffsettemp < t && t < toffsettemp + theater(5) %heating 20s
-%        PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-%     end
-% 
-%    
-% 
-%     if t> toffsettemp + theater(5)+toffset(6)
-%         break
-%     end
+
+    toffsettemp = toffset(1) + theater(1) + toffset(2);
+
+    if toffsettemp < t && t < toffsettemp + theater(2) %heating 5s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
+       Pheatersave = PHeater;
+    end
+
+
+    toffsettemp = toffsettemp + theater(2) + toffset(3);
+
+    if toffsettemp < t && t < toffsettemp + theater(3) %heater 10s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
+       Pheatersave = PHeater;
+    end
+
+    toffsettemp = toffsettemp + theater(3) + toffset(4);
+
+
+    if toffsettemp < t && t < toffsettemp + theater(4) %heating 15s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
+       Pheatersave = PHeater;
+    end
+    toffsettemp = toffsettemp + theater(4) + toffset(5);
+
+    if toffsettemp < t && t < toffsettemp + theater(5) %heating 20s
+       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
+       Pheatersave = PHeater;
+    end
+
+
+
+    if t> toffsettemp + theater(5)+toffset(6)
+        break
+    end
 
 
     timeMaterialCalculationNext = now*24*3600;
@@ -509,7 +541,13 @@ for iterationIndex = 1:maxIteration
         R_thermal = 0.5*thCond./(thermalConductivityArray)+1./h_helium_array; %Thermal resistance, including heat conductivity
         
         Qheliumcoolingarray = 2.*cooling_area_correction_factor*A_helium.*(temperatureArray-temperature_helium)./R_thermal; %(area from 2 sides)
-         
+        
+
+        if Helium_cooling == 0
+            Qheliumcoolingarray(:,:) = 0;
+        end
+
+
         % 
         % QElementArray_temp(1:resolution:numTransverse*resolution,round(size(temperatureArray,2)/2)) = QElementArray_temp(1:resolution:numTransverse*resolution,round(size(temperatureArray,2)/2)) + Qaxialarray; %add heat flow for bottom part sign convention 
         % QElementArray_temp(numPointsPerTurn:resolution:(numTransverse-1)*resolution+numPointsPerTurn,round(size(temperatureArray,2)/2)) = QElementArray_temp(numPointsPerTurn:resolution:(numTransverse-1)*resolution+numPointsPerTurn,round(size(temperatureArray,2)/2)) - Qaxialarray; %add heat flow for bottom part sign convention 
@@ -520,12 +558,15 @@ for iterationIndex = 1:maxIteration
 
         
 
-
+        if copper_conduction == 1
 %%%Add copper at the bottom
         QElementArray_temp(1:numPointsPerTurn,:) = QElementArray_temp(1:numPointsPerTurn,:) -QringBottomarray; % - since QringBottomarray is + if temperature of ring smaller than temperature of cylinder
 
 %%%Add copper at the top
         QElementArray_temp(end+1-numPointsPerTurn:end,:) = QElementArray_temp(end+1-numPointsPerTurn:end,:) - QringToparray; % - since QringToparray is + if temperature of ring smaller than temperature of cylinder
+
+        end
+
 
         QElementArray = QElementArray_temp - Qheliumcoolingarray;
 
@@ -561,7 +602,7 @@ for iterationIndex = 1:maxIteration
 
     temperatureRingTophistory(:,iterationIndex) =   temperatureRingTop;
     temperatureRingBottomhistory(:,iterationIndex) = temperatureRingBottom;
-
+    temperaturemax(iterationIndex) = max(temperatureArray(:));
     % *****
     % Material property calculation
     timeTemperatureNext = now*24*3600; 
@@ -572,7 +613,7 @@ for iterationIndex = 1:maxIteration
     
     s.RArrayTrans = RArrayTrans;
     s.IcArray = IcArray;   %critical current of superconductor
-    s.ISCArray = ISCArray;  %current in superocnductor
+    %s.ISCArray = ISCArray;  %current in superocnductor
     s.externalVoltagedIdtVector = s.externalVoltagedIdtVector;
     s.bVector = [];
     s.VGroundVector = [];
@@ -602,13 +643,13 @@ for iterationIndex = 1:maxIteration
     tArrayhistory(iterationIndex) = t;
     IArrayhistory(:,iterationIndex) = IArray;
     VGroundVector = myODEVoltages(t, IArray, s);
-    V_local_element = diff(VGroundVector);
-    V_local_element(end+1) = 0;
+    % V_local_element = diff(VGroundVector);
+    % V_local_element(end+1) = 0;
 
 
     Qheliumcoolingarrayhistory(:,:,iterationIndex) = Qheliumcoolingarray;
     VGroundVectorhistory(:,iterationIndex) = VGroundVector;
-
+    Efield(iterationIndex) = 1e6*(VGroundVector(round(length(VGroundVector)*1/10))-VGroundVector(round(length(VGroundVector)*9/10)))./(4*2*pi*0.12);
 
     timeOdeNext = now*24*3600;
 
@@ -636,6 +677,11 @@ for iterationIndex = 1:maxIteration
     ylabel('B_{center} [T]')
     grid on
     dIdt = myODE(t, IArray, s);
+    
+
+    fprintf(fileID,'%0.6g, %0.6f, %0.3f %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerBhistory(1,end) Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
+
+
 end 
 
     
