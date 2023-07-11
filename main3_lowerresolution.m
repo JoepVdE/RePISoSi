@@ -16,13 +16,13 @@ HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
 
 
-Description = 'run4431AnoheliumcoolingallCopperode15s';
+Description = 'run4431Anoheliumnocoppercurrent_withheliumcooling';
 FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
 fileID = fopen(FileName,'w');
 
-Helium_cooling = 0; %1 is on, 0 is off.
+Helium_cooling = 1; %1 is on, 0 is off.
 copper_heat = 1; %1 is on, 0 is off.
-copper_conduction = 1;%1 is on, 0 is off.
+copper_conduction = 0;%1 is on, 0 is off.
 
 
 toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
@@ -691,7 +691,7 @@ end
 
 
 end 
-
-    
+fclose(fileID);
+save(append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.mat'))
 toc       
     
