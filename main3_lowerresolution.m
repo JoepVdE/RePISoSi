@@ -16,11 +16,11 @@ HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
 
 
-Description = 'run4431AheliumcoolingallCopper';
+Description = 'run4431AnoheliumcoolingallCopperode15s';
 FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
 fileID = fopen(FileName,'w');
 
-Helium_cooling = 1; %1 is on, 0 is off.
+Helium_cooling = 0; %1 is on, 0 is off.
 copper_heat = 1; %1 is on, 0 is off.
 copper_conduction = 1;%1 is on, 0 is off.
 
@@ -477,7 +477,7 @@ end
 
 
 
-    if t> toffsettemp + theater(5)+toffset(6)
+    if t> 600
         break
     end
 
@@ -634,7 +634,9 @@ end
     timeOdePrevious = timeOdeNext;
     myfun = @(t, IArray)myODE(t, IArray, s); 
     % [tArchive, IArrayArchive] = ode23tb(myfun, tspan, IArray0); % Function ode23tb solves stiff differential equations, low order method 
-    [tArchive, IArrayArchive] = ode23s(myfun, tspan, IArray0); %GOOD ONE
+ %   [tArchive, IArrayArchive] = ode23s(myfun, tspan, IArray0); %GOOD ONE
+        [tArchive, IArrayArchive] = ode15s(myfun, tspan, IArray0); %GOOD ONE
+
     %[tArchive, IArrayArchive] = ode89(myfun, tspan, IArray0); 
     t = tArchive(length(tArchive));
     IArray = IArrayArchive(length(tArchive), :)';        
@@ -676,7 +678,13 @@ end
     xlabel('t [s]')
     ylabel('B_{center} [T]')
     grid on
-    dIdt = myODE(t, IArray, s);
+
+    figure(3)
+    plot(tArrayhistory,Efield,Color='b',Marker='.',MarkerSize=10,LineStyle='-')
+    xlabel('t [s]')
+    ylabel('E_{field} [\muV/m]')
+    grid on
+    %dIdt = myODE(t, IArray, s);
     
 
     fprintf(fileID,'%0.6g, %0.6f, %0.3f %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerBhistory(1,end) Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
