@@ -37,28 +37,32 @@ figure(2)
 
 
 
-
+index1 = round(length(VGroundVector)*1/10);
+index2 = round(length(VGroundVector)*9/10);
 
 
 for k = 1:size(VGroundVectorhistory,2)-1
-round(length(VGroundVector)*1/10)
-round(length(VGroundVector)*9/10)
-Ecoil(k) = 1e6*(VGroundVectorhistory(round(length(VGroundVector)*1/10),k)-VGroundVectorhistory(round(length(VGroundVector)*9/10),k))./(4*2*pi*0.12);
+
+Ecoil(k) = 1e6*(mean(VGroundVectorhistory(1:round(length(VGroundVector)*1/5),k)) - mean(VGroundVectorhistory(round(length(VGroundVector)*4/5):end,k)))/(2*pi*0.12);
 end
 figure(4)
 plot(tArrayhistory(1:length(Ecoil)),Ecoil)
 xlabel('time [s]')
 ylabel('E [\muV/m]')
-
+grid on
 figure(5)
 plot(tArrayhistory(1:length(centerBhistory)),centerBhistory)
 xlabel('time [s]')
 ylabel('B [T]')
-
+grid on
 figure(6)
 plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingBottomhistory)
+hold on
+plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingTophistory)
+grid on
 xlabel('time [s]')
 ylabel('T [K]')
+legend('T_{bottomlead}','T_{toplead}')
 
 
 % N = 31    ;

@@ -5,14 +5,14 @@ figure(2)
    s3 = ' s';
 
 
-v = VideoWriter('IArrayhistoryaxialincludingcopperheliumcoolingandaxialresistanceheating2.mp4','MPEG-4');
-v.FrameRate = 10;
+v = VideoWriter('Iarray_Isc_fullprofilenoheliumcooling.mp4','MPEG-4');
+v.FrameRate = 5;
 open(v);
 
 for k = 1:size(IArrayhistory,2)
-    if tArrayhistory(k) > 40
-        break
-    end
+    % if tArrayhistory(k) > 11
+    %     break
+    % end
 
 
    titlestring = strcat(s1,num2str(tArrayhistory(k),3),s3);
