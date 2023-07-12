@@ -16,13 +16,13 @@ HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
 
 
-Description = '5turn';
+Description = '5turn4431A_CoolingCopperConductionnoHeat';
 FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
 fileID = fopen(FileName,'w');
 
 Helium_cooling = 1; %1 is on, 0 is off.
 copper_heat = 0; %1 is on, 0 is off.
-copper_conduction = 0;%1 is on, 0 is off.
+copper_conduction = 1;%1 is on, 0 is off.
 
 
 toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
@@ -559,7 +559,7 @@ end
 
         
 
-        if copper_conduction == 1
+        if copper_heat == 1
 %%%Add copper at the bottom
         QElementArray_temp(1:numPointsPerTurn,:) = QElementArray_temp(1:numPointsPerTurn,:) -QringBottomarray; % - since QringBottomarray is + if temperature of ring smaller than temperature of cylinder
 
