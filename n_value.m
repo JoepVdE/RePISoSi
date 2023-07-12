@@ -7,5 +7,5 @@ function [n] = n_value(T, HTStapeName)
         n(T < min(T_meas)) = 66; 
         n(T > max(T_meas)) = 7;  
     end
-    
+
 end 
