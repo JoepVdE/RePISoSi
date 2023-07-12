@@ -85,6 +85,8 @@ for index = 1:numTransverse
     
     indexRef = index + numLinesAlongWire;
     x1Array(indexRef) = xArray(spacing*(index-1)+1); 
+    index
+    spacing*(index-1) + numPointsPerTurn+1
     x2Array(indexRef) = xArray(spacing*(index-1) + numPointsPerTurn+1);   % Off-by-one-turn 
     y1Array(indexRef) = yArray(spacing*(index-1)+1);
     y2Array(indexRef) = yArray(spacing*(index-1) + numPointsPerTurn+1);   % Off-by-one-turn

@@ -16,12 +16,12 @@ HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
 
 
-Description = 'run4431Anoheliumnocoppercurrent_withheliumcooling';
+Description = '5turn';
 FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
 fileID = fopen(FileName,'w');
 
 Helium_cooling = 1; %1 is on, 0 is off.
-copper_heat = 1; %1 is on, 0 is off.
+copper_heat = 0; %1 is on, 0 is off.
 copper_conduction = 0;%1 is on, 0 is off.
 
 
@@ -29,7 +29,7 @@ toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
 theater = [1.633,5.478,10.304,15.42,19.826]; %[s]   time in between heating pulses
 RHeater = 350; % resistance of heater [Ohm]
 VHeater = 80; % voltage over heater V
-%Vheater = 80;
+%Vheater = 20;
 PHeater = VHeater.^2/RHeater;
 %PHeater = 18; %[W]
 dTMax = 5;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
@@ -40,7 +40,7 @@ temperature_helium = initial_temperature; %[K]
 % ***** Solenoid properties ***** 
 RSol = 0.12;                 % Solenoid radius (m)
 N_shorts = 19;               % Number of shorts per turn
-%N_shorts = 6;               % Number of shorts per turn
+%N_shorts = 32;               % Number of shorts per turn
 
 arclengthSlot = 4*10^(-2);      % arclength of slot (m)
 arclengthShort = 3.7*10^(-3);     %arclength of short (m)
@@ -64,12 +64,12 @@ thWallatShort = 5e-3; %[m] thickness of the short wall in between slots.
 heightSlot = 1e-3; %[m] 
 ACond = wCond.*thCond;       % Cross-sectional area of the conductor (m)        is actually 7.5 mm but needs to be 8.5 here to include the 1 mm gap
 
-numWindings = 5;            % Number of turn forming a solenoid (dimensionless)
+numWindings = 15;            % Number of turn forming a solenoid (dimensionless)
 len = numWindings*(wCond + thSlot);     % Length of a solenoid (m)
 
 ignoreMutualInductancesTransverseElements = 0; % (yes = 1, no = 0)
 numThermalSubdivisions = 3;  % Number of subdivisions
-temperatureSubSteps = 10;   % Number of temperature timesteps per magnetic timestep 
+temperatureSubSteps = 100;   % Number of temperature timesteps per magnetic timestep 
 
 
 
@@ -138,7 +138,7 @@ numLinesAlongWire = numPoints - 1;
 
 dIdt = zeros(numLinesAlongWire,1); %initial dIdt
 %numTransverse = floor((numWindings - 1)*numPointsPerTurn + 1); 
-numTransverse = floor((numWindings - 1)*N_shorts + 1)-2; %TODO waarom -2? waarom loopt hij niet goed in de eerste plaats
+numTransverse = floor((numWindings - 1)*N_shorts + 1)-round((numWindings/2)); %It has 0.5 turn leftover each round. That's why
 numTransverse = max(numTransverse, 0); 
 numLines = numLinesAlongWire + numTransverse; 
 
@@ -199,7 +199,7 @@ IArray(1:numLinesAlongWire) = I0; % Current is only induced along the line
 %initial_temperature = 77; % Initial temperature of 77 K
 temperatureArray = ones(numPoints - 1, numThermalSubdivisions)*initial_temperature;  
 %temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 10; % Hotspot 10 K
-temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 20.5; % Hotspot 100 K
+temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 22; % Hotspot 100 K
 
 
 % ***** Turn-to-turn resistance ***** 
@@ -255,6 +255,7 @@ fprintf(fileID,'Initial temperature [K]: %.1f\n', initial_temperature);
 fprintf(fileID,'Power of Heater [W]: %.1f\n', PHeater);
 fprintf(fileID,'Heating time [s]: %.1f\n', theater);
 fprintf(fileID,'deltaTmax (used for determination time step) [K]: %.1f\n', dTMax);
+fprintf(fileID,'temperatureSubSteps [-]: %.1f\n', temperatureSubSteps);
 fprintf(fileID,'Status Helium convection cooling (1 = on, 0 = off): %.1g\n', Helium_cooling);
 fprintf(fileID,'Status Copper heat conduction cooling (1 = on, 0 = off): %.1g\n', copper_heat);
 fprintf(fileID,'Status Copper conductivitiy (1 = on, 0 = off): %.1g\n \n \n', copper_conduction);
@@ -582,11 +583,8 @@ end
         dTdtCopperBottom = sum(sum(QringBottomarray))/heatCapacityCopperbottom;
 
 
-
-
         if max(max(abs(dTdtElementArray)))/temperatureSubSteps == 0
             disp('divide by 0')
-
         end
 
         %nancheck(iterationIndex,temperatureIterationIndex) = dtLocal ;%bugfixing
