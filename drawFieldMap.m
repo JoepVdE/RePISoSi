@@ -1,4 +1,4 @@
-function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
+function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire,numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
     temperatureArray, mutualInductanceSpaceRatio, IArray) 
     % drawFieldMap is a script relying on the parameters specified in run
     % script 
@@ -20,10 +20,12 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
     
     
     set(gcf, 'color', 'w'); 
+    set(gcf,'position',[3 4 1500 1000])
+
     hold off;
 
     % Plot selections (Yes = 1, No = 0) 
-    plotLongitudinalLines = 1;     
+    plotLongitudinalLines =0;     
     plotLongitudinalLinesBMag = 0;  
     plotTransverseLines = 0;
     plotFieldOnConductor = 1;
@@ -129,11 +131,11 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
         xmin = 0; 
         xmax = 0; 
         numx = 1;
-        ymin = -RSol*3; 
-        ymax = RSol*3; 
+        ymin = -RSol*2; 
+        ymax = RSol*2; 
         numy = numPointsFieldMap;    
-        zmin = -len*2; 
-        zmax = len*2; 
+        zmin = -RSol*0.6; 
+        zmax = RSol*0.6; 
         numz = numPointsFieldMap;
 
         disp('Plotting field map')
@@ -218,13 +220,14 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
         colormap('jet')
         handle = colorbar; 
         daspect([1, 1, 1]);
-        view(80, 40);
+        view(80, 15);
     end
 
-    axis([-maxSize, maxSize, -maxSize, maxSize, -maxSize, maxSize]);
-    xlabel('{\it x} / m');
-    ylabel('{\it y} / m');
-    zlabel('{\it z} / m');
-    ylabel(handle, 'Temperature / K'); 
-
+    axis([-maxSize, maxSize, -maxSize, maxSize, -RSol*0.6, RSol*0.6]);
+    xlabel('{\it x} [m]');
+    ylabel('{\it y} [m]');
+    zlabel('{\it z} [m]');
+    ylabel(handle, 'Temperature [K]');
+    
+    
 end 

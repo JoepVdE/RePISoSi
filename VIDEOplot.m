@@ -5,8 +5,8 @@ figure(2)
    s3 = ' s';
 
 
-v = VideoWriter('Iarray_Isc_fullprofilenoheliumcooling.mp4','MPEG-4');
-v.FrameRate = 5;
+v = VideoWriter('Iarray_Isc_400mm15turntry2.mp4','MPEG-4');
+v.FrameRate = 2;
 open(v);
 
 for k = 1:size(IArrayhistory,2)
@@ -26,7 +26,7 @@ for k = 1:size(IArrayhistory,2)
    legend('I in line element','I_c of line element',Location='southwest')
    grid on
       ylim([-4000 8000])
-   xlim([1 450])
+   xlim([1 length(IcArray)])
 ylabel('Current [A]')
    xlabel('Line element number [-]')
    frame = getframe(gcf);
