@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
 - family-names: "Van den Eijnden"
-  given-names: "Joep"
+  given-names: "Joep Léon"
   orcid: "https://orcid.org/0000-0002-3204-3465"
 - family-names: "Vaskuri"
   given-names: "Anna"
