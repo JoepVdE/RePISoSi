@@ -7,6 +7,10 @@ authors:
 - family-names: "Vaskuri"
   given-names: "Anna"
   orcid: "https://orcid.org/0000-0003-1246-4550"
+- family-names: "Mentink"
+  given-names: "Matthias"
+  orcid: "https://orcid.org/0000-0001-9769-0578"
+
 title: "ReBCO Partially Insulated Solenoid Simulation"
 version: 1.0
 doi: 
