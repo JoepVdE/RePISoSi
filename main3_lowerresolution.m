@@ -14,25 +14,32 @@ set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 format long
 HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
+writedata = 1; %write output file 1 = yes 0 = no
 
-
-Description = 'run4431Anoheliumnocoppercurrent_withheliumcooling';
+Description = '5turn4431A_CoolingCopperConductionnoHeat_1Ktimestep';
 FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
+
+if writedata ==1
 fileID = fopen(FileName,'w');
+end
+v = VideoWriter(append(Description,'.mp4'),'MPEG-4');
+v.FrameRate = 2;
+open(v);
+
 
 Helium_cooling = 1; %1 is on, 0 is off.
-copper_heat = 1; %1 is on, 0 is off.
-copper_conduction = 0;%1 is on, 0 is off.
+copper_heat = 0; %1 is on, 0 is off.
+copper_conduction = 1;%1 is on, 0 is off.
 
 
 toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
 theater = [1.633,5.478,10.304,15.42,19.826]; %[s]   time in between heating pulses
 RHeater = 350; % resistance of heater [Ohm]
 VHeater = 80; % voltage over heater V
-%Vheater = 80;
+%Vheater = 20;
 PHeater = VHeater.^2/RHeater;
 %PHeater = 18; %[W]
-dTMax = 5;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
+dTMax = 1;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
 initial_temperature = 20; % Initial temperature of 4 K
 pressure_cryostat = 0.15; %bar
 temperature_helium = initial_temperature; %[K]
@@ -40,7 +47,7 @@ temperature_helium = initial_temperature; %[K]
 % ***** Solenoid properties ***** 
 RSol = 0.12;                 % Solenoid radius (m)
 N_shorts = 19;               % Number of shorts per turn
-%N_shorts = 6;               % Number of shorts per turn
+%N_shorts = 32;               % Number of shorts per turn
 
 arclengthSlot = 4*10^(-2);      % arclength of slot (m)
 arclengthShort = 3.7*10^(-3);     %arclength of short (m)
@@ -69,7 +76,7 @@ len = numWindings*(wCond + thSlot);     % Length of a solenoid (m)
 
 ignoreMutualInductancesTransverseElements = 0; % (yes = 1, no = 0)
 numThermalSubdivisions = 3;  % Number of subdivisions
-temperatureSubSteps = 10;   % Number of temperature timesteps per magnetic timestep 
+temperatureSubSteps = 100;   % Number of temperature timesteps per magnetic timestep 
 
 
 
@@ -138,7 +145,7 @@ numLinesAlongWire = numPoints - 1;
 
 dIdt = zeros(numLinesAlongWire,1); %initial dIdt
 %numTransverse = floor((numWindings - 1)*numPointsPerTurn + 1); 
-numTransverse = floor((numWindings - 1)*N_shorts + 1)-2; %TODO waarom -2? waarom loopt hij niet goed in de eerste plaats
+numTransverse = floor((numWindings - 1)*N_shorts + 1)-round((numWindings/2)); %It has 0.5 turn leftover each round. That's why
 numTransverse = max(numTransverse, 0); 
 numLines = numLinesAlongWire + numTransverse; 
 
@@ -199,7 +206,7 @@ IArray(1:numLinesAlongWire) = I0; % Current is only induced along the line
 %initial_temperature = 77; % Initial temperature of 77 K
 temperatureArray = ones(numPoints - 1, numThermalSubdivisions)*initial_temperature;  
 %temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 10; % Hotspot 10 K
-temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 20.5; % Hotspot 100 K
+temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 22; % Hotspot 100 K
 
 
 % ***** Turn-to-turn resistance ***** 
@@ -241,7 +248,7 @@ VGroundVector = zeros(numLinesAlongWire,1);
 IExt = I0; % External current 
 %edit
 %IArray(1:numLinesAlongWire) = I0; % Initial current 
-
+if writedata ==1
 fprintf(fileID,'Input Parameters RePISoSi code: \n \n');
 fprintf(fileID,'Initial Current: %.0f [A]\n', I0);
 fprintf(fileID,'Radius solenoid: %.3f [m]\n', RSol);
@@ -255,13 +262,14 @@ fprintf(fileID,'Initial temperature [K]: %.1f\n', initial_temperature);
 fprintf(fileID,'Power of Heater [W]: %.1f\n', PHeater);
 fprintf(fileID,'Heating time [s]: %.1f\n', theater);
 fprintf(fileID,'deltaTmax (used for determination time step) [K]: %.1f\n', dTMax);
+fprintf(fileID,'temperatureSubSteps [-]: %.1f\n', temperatureSubSteps);
 fprintf(fileID,'Status Helium convection cooling (1 = on, 0 = off): %.1g\n', Helium_cooling);
 fprintf(fileID,'Status Copper heat conduction cooling (1 = on, 0 = off): %.1g\n', copper_heat);
 fprintf(fileID,'Status Copper conductivitiy (1 = on, 0 = off): %.1g\n \n \n', copper_conduction);
 
 fprintf(fileID,'time [s], centerB [T], Pheater [W], TringTop [K], TringBottom [K], Efield [uV/m], Tmax [K] \n');
 
-
+end
 disp('Transient calculation'); 
 
 maxIteration = 50000; % Number of iterations 
@@ -282,7 +290,7 @@ timeNextIteration = now*24*3600;
 
 pause(0.1); 
 
-drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
+drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire,numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
     x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
     temperatureArray, mutualInductanceSpaceRatio, IArray); 
 
@@ -558,7 +566,7 @@ end
 
         
 
-        if copper_conduction == 1
+        if copper_heat == 1
 %%%Add copper at the bottom
         QElementArray_temp(1:numPointsPerTurn,:) = QElementArray_temp(1:numPointsPerTurn,:) -QringBottomarray; % - since QringBottomarray is + if temperature of ring smaller than temperature of cylinder
 
@@ -582,11 +590,8 @@ end
         dTdtCopperBottom = sum(sum(QringBottomarray))/heatCapacityCopperbottom;
 
 
-
-
         if max(max(abs(dTdtElementArray)))/temperatureSubSteps == 0
             disp('divide by 0')
-
         end
 
         %nancheck(iterationIndex,temperatureIterationIndex) = dtLocal ;%bugfixing
@@ -662,11 +667,13 @@ end
 
     if(mod(iterationIndex,drawFigureAtIteration) == 0)
         hold on
-        centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
+        centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numTransverse,numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
             x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
             temperatureArray, mutualInductanceSpaceRatio, IArray); 
         title(sprintf('Iteration = %0.0f, t = %0.3g s, I_{ext} = %0.2f A', iterationIndex, t, IExt));
         pause(0.1) 
+        frame = getframe(gcf);
+        writeVideo(v,frame);
         hold off
     end 
     
@@ -686,12 +693,16 @@ end
     grid on
     %dIdt = myODE(t, IArray, s);
     
-
+    if writedata ==1
     fprintf(fileID,'%0.6g, %0.6f, %0.3f %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerBhistory(1,end) Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
-
+    end
 
 end 
+
+if writedata ==1
 fclose(fileID);
+end
+close(v);
 save(append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.mat'))
 toc       
     
