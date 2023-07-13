@@ -14,11 +14,18 @@ set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 format long
 HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
+writedata = 1; %write output file 1 = yes 0 = no
 
-
-Description = '5turn4431A_CoolingCopperConductionnoHeat';
+Description = '5turn4431A_CoolingCopperConductionnoHeat_1Ktimestep';
 FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
+
+if writedata ==1
 fileID = fopen(FileName,'w');
+end
+v = VideoWriter(append(Description,'.mp4'),'MPEG-4');
+v.FrameRate = 2;
+open(v);
+
 
 Helium_cooling = 1; %1 is on, 0 is off.
 copper_heat = 0; %1 is on, 0 is off.
@@ -32,7 +39,7 @@ VHeater = 80; % voltage over heater V
 %Vheater = 20;
 PHeater = VHeater.^2/RHeater;
 %PHeater = 18; %[W]
-dTMax = 5;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
+dTMax = 1;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
 initial_temperature = 20; % Initial temperature of 4 K
 pressure_cryostat = 0.15; %bar
 temperature_helium = initial_temperature; %[K]
@@ -64,7 +71,7 @@ thWallatShort = 5e-3; %[m] thickness of the short wall in between slots.
 heightSlot = 1e-3; %[m] 
 ACond = wCond.*thCond;       % Cross-sectional area of the conductor (m)        is actually 7.5 mm but needs to be 8.5 here to include the 1 mm gap
 
-numWindings = 15;            % Number of turn forming a solenoid (dimensionless)
+numWindings = 5;            % Number of turn forming a solenoid (dimensionless)
 len = numWindings*(wCond + thSlot);     % Length of a solenoid (m)
 
 ignoreMutualInductancesTransverseElements = 0; % (yes = 1, no = 0)
@@ -241,7 +248,7 @@ VGroundVector = zeros(numLinesAlongWire,1);
 IExt = I0; % External current 
 %edit
 %IArray(1:numLinesAlongWire) = I0; % Initial current 
-
+if writedata ==1
 fprintf(fileID,'Input Parameters RePISoSi code: \n \n');
 fprintf(fileID,'Initial Current: %.0f [A]\n', I0);
 fprintf(fileID,'Radius solenoid: %.3f [m]\n', RSol);
@@ -262,7 +269,7 @@ fprintf(fileID,'Status Copper conductivitiy (1 = on, 0 = off): %.1g\n \n \n', co
 
 fprintf(fileID,'time [s], centerB [T], Pheater [W], TringTop [K], TringBottom [K], Efield [uV/m], Tmax [K] \n');
 
-
+end
 disp('Transient calculation'); 
 
 maxIteration = 50000; % Number of iterations 
@@ -283,7 +290,7 @@ timeNextIteration = now*24*3600;
 
 pause(0.1); 
 
-drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
+drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire,numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
     x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
     temperatureArray, mutualInductanceSpaceRatio, IArray); 
 
@@ -660,11 +667,13 @@ end
 
     if(mod(iterationIndex,drawFigureAtIteration) == 0)
         hold on
-        centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
+        centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numTransverse,numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
             x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
             temperatureArray, mutualInductanceSpaceRatio, IArray); 
         title(sprintf('Iteration = %0.0f, t = %0.3g s, I_{ext} = %0.2f A', iterationIndex, t, IExt));
         pause(0.1) 
+        frame = getframe(gcf);
+        writeVideo(v,frame);
         hold off
     end 
     
@@ -684,12 +693,16 @@ end
     grid on
     %dIdt = myODE(t, IArray, s);
     
-
+    if writedata ==1
     fprintf(fileID,'%0.6g, %0.6f, %0.3f %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerBhistory(1,end) Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
-
+    end
 
 end 
+
+if writedata ==1
 fclose(fileID);
+end
+close(v);
 save(append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.mat'))
 toc       
     
