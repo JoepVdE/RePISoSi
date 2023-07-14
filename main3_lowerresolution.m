@@ -32,7 +32,7 @@ copper_heat = 0; %1 is on, 0 is off.
 copper_conduction = 1;%1 is on, 0 is off.
 
 
-toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
+toffset = [8.071,48.795,70.456,84.040,69.285,100] - 8.071; % [s] time heater is on
 theater = [1.633,5.478,10.304,15.42,19.826]; %[s]   time in between heating pulses
 RHeater = 350; % resistance of heater [Ohm]
 VHeater = 80; % voltage over heater V
@@ -118,8 +118,7 @@ L = 2.44E-8; %[V^2K^-2]
 ktable = 1E6.*Tinitialise.*L./BlochGrun(Tinitialise,0.24233,432.43,0.0247015,5);
 rhotable = BlochGrun(Tinitialise,0.24233,432.43717,0.0247015,5)/1E6;
 % ***** 
-
-%%
+%
 
 % ***** Initialize mesh for FEM ***** 
 
@@ -230,7 +229,7 @@ Nu = 4.36; %Nusselt number for steady laminar pipe flow
 %RArrayTrans = ones(numTransverse, 1)*axialshortResistance;
 
 %RArrayTrans = turnToTurnResistance/numPointsPerTurn; % Transverse resistance array (ohm) 
-%%
+%
 
 volumeArray = (lenArray(1:numLinesAlongWire)./numThermalSubdivisions ... 
     .*thCond*wCond)*ones(1, numThermalSubdivisions);
@@ -288,11 +287,11 @@ timeMaterialCalculationPrevious = timeMaterialCalculationNext;
 timeLastIteration = now*24*3600;
 timeNextIteration = now*24*3600;
 
-pause(0.1); 
 
-drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire,numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
+centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire,numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
     x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
     temperatureArray, mutualInductanceSpaceRatio, IArray); 
+
 
 t = 0; % Initial time (s) 
         temperatureRingTop = temperatureRing;
@@ -382,11 +381,11 @@ for iterationIndex = 1:maxIteration
     RArrayTrans(end+1) = RArrayTrans(end);
 
     RNormalArray = resistivityNormalArray.*lenArrayAlongWire(1:numLinesAlongWire)./(ACond.*numThermalSubdivisions);			
-if copper_conduction == 1
-    RNormalArray(1:round(length(RNormalArray)/5),:) =         ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1),BArray(1:round(length(RNormalArray)/5)),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
-    RNormalArray(round(1+4*length(RNormalArray)/5):end,:) =     ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1), ...
+    if copper_conduction == 1
+        RNormalArray(1:round(length(RNormalArray)/5),:) =         ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1),BArray(1:round(length(RNormalArray)/5)),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
+        RNormalArray(round(1+4*length(RNormalArray)/5):end,:) =     ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1), ...
         BArray(round(1+4*length(RNormalArray)/5):round(length(RNormalArray))),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
-end
+    end
 
     IAbsArray = abs(IArray(1:numLinesAlongWire))*ones(1, numThermalSubdivisions); % Total current (A)
     %E0 = 100*1E-6; %[V/m] critical E-field convention
@@ -666,12 +665,14 @@ end
     BLocalZArray = BiotSavartMatrixZ*IArray; 
 
     if(mod(iterationIndex,drawFigureAtIteration) == 0)
-        hold on
+        
         centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numTransverse,numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
             x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
             temperatureArray, mutualInductanceSpaceRatio, IArray); 
         title(sprintf('Iteration = %0.0f, t = %0.3g s, I_{ext} = %0.2f A', iterationIndex, t, IExt));
         pause(0.1) 
+        figure(1);
+        hold on
         frame = getframe(gcf);
         writeVideo(v,frame);
         hold off
@@ -680,7 +681,6 @@ end
     
     centerBhistory(iterationIndex) = centerB;
     figure(2)
-    hold off
     plot(tArrayhistory,centerBhistory,Color='b',Marker='.',MarkerSize=10,LineStyle='-')
     xlabel('t [s]')
     ylabel('B_{center} [T]')
@@ -694,7 +694,7 @@ end
     %dIdt = myODE(t, IArray, s);
     
     if writedata ==1
-    fprintf(fileID,'%0.6g, %0.6f, %0.3f %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerBhistory(1,end) Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
+    fprintf(fileID,'%0.6g, %0.6f, %0.3f, %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerBhistory(1,end) Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
     end
 
 end 
