@@ -163,17 +163,17 @@ if ~ishold_flag
     hold(ax, 'off');
 end
 
-if p.Results.Colorbar
-    cb = colorbar(ax);
-    tlabels = cb.TickLabels;
-    tlabels = sprintfc('%1.3g ',linspace(Imin, Imax, length(tlabels)));
-    cb.TickLabels = tlabels;
-end
-
-MyColorBar = colorbar;
-TickL = get(MyColorBar,'Ticklabels');
-TickL = sprintfc('%1.3g ',((1:length(TickL)) - 1)*Imax/length(TickL));
-set(MyColorBar, 'TickLabels', TickL); 
+% if p.Results.Colorbar
+%     cb = colorbar(ax);
+%     tlabels = cb.TickLabels;
+%     tlabels = sprintfc('%1.3g ',linspace(Imin, Imax, length(tlabels)));
+%     cb.TickLabels = tlabels;
+% end
+% 
+% MyColorBar = colorbar;
+% TickL = get(MyColorBar,'Ticklabels');
+% TickL = sprintfc('%1.3g ',((1:length(TickL)) - 1)*Imax/length(TickL));
+% set(MyColorBar, 'TickLabels', TickL); 
 
 end 
 

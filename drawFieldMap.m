@@ -2,34 +2,31 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
     temperatureArray, mutualInductanceSpaceRatio, IArray) 
     % drawFieldMap is a script relying on the parameters specified in run
     % script 
-    figure(1)
+    fig = figure(1)
+    clf(fig); 
+    set(gcf, 'color', 'w'); 
+    set(gcf,'position',[3 4 1500 1000])
+
+    hold on;
+
     % Distance between the turns             
     xDiffArray = x2Array - x1Array;
     yDiffArray = y2Array - y1Array;
     zDiffArray = z2Array - z1Array; 
 
     lenArray = sqrt(xDiffArray.^2 + yDiffArray.^2 + zDiffArray.^2);
-%     lenArrayAlongWire = lenArray(1:numLinesAlongWire);
-%     lenArrayAlongWireElements = lenArrayAlongWire*ones(1, numThermalSubdivisions)./numThermalSubdivisions;
 
     % Middle coordinates between the turns 
     xMidArray = 0.5*(x1Array + x2Array);
     yMidArray = 0.5*(y1Array + y2Array);
     zMidArray = 0.5*(z1Array + z2Array); 
     
-    
-    
-    set(gcf, 'color', 'w'); 
-    set(gcf,'position',[3 4 1500 1000])
-
-    hold off;
-
     % Plot selections (Yes = 1, No = 0) 
     plotLongitudinalLines =0;     
     plotLongitudinalLinesBMag = 0;  
     plotTransverseLines = 0;
-    plotFieldOnConductor = 1;
-    plotCurrent = 1;
+    plotFieldOnConductor = 0;
+    plotCurrent = 0;
     plotFieldMap = 1;
 
     % Color transparency
@@ -50,24 +47,16 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
 
     % First the lines 
     if(plotLongitudinalLines == 1)
-        hold on;
-        %for index=1:numLinesAlongWire
-        %    plot3([x1Array(index) x2Array(index)],[y1Array(index) y2Array(index)],[z1Array(index) z2Array(index)],'b');
-        %    hold on;
-        %end
-        %plot3([x1Array x2Array(numLinesAlongWire)],[y1Array y2Array(numLinesAlongWire)],[z1Array z2Array(numLinesAlongWire)],'b');
-        %plot3([x1Array(1:numLinesAlongWire); x2Array(numLinesAlongWire)],[y1Array(1:numLinesAlongWire); y2Array(numLinesAlongWire)],[z1Array(1:numLinesAlongWire); z2Array(numLinesAlongWire)],'k');
+
         colormap('jet')
         daspect([1, 1, 1]);
         view(80, 40);
-
 
         if(plotCurrent == 1)
             sPlot = surf(xPlot, yPlot, zPlot, colorPlot, 'FaceAlpha', conductorTransparency);
         else
             sPlot = surf(xPlot, yPlot, zPlot, colorPlot);
         end
-        %sPlot.EdgeColor = 'none';
         colormap('jet')
         handle = colorbar;
     end
@@ -75,38 +64,25 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
     % First the lines
     if(plotLongitudinalLinesBMag == 1)
         BNormArray = sqrt(BLocalXArray.^2 + BLocalYArray.^2 + BLocalZArray.^2);
-        BNormArray = BNormArray(1:numLinesAlongWire);
-        %for index = 1:numLinesAlongWire
-        %    plot3([x1Array(index) x2Array(index)],[y1Array(index) y2Array(index)],[z1Array(index) z2Array(index)],'b');
-        %    hold on;
-        %end
-        %plot3([x1Array x2Array(numLinesAlongWire)],[y1Array y2Array(numLinesAlongWire)],[z1Array z2Array(numLinesAlongWire)],'b');
+        BNormArray = BNormArray(1:numLinesAlongWire); 
+   
         p = plot3([x1Array(1:numLinesAlongWire); x2Array(numLinesAlongWire)], ...
                   [y1Array(1:numLinesAlongWire); y2Array(numLinesAlongWire)], ... 
-                  [z1Array(1:numLinesAlongWire); z2Array(numLinesAlongWire)], 'k');
-        hold on;
-        %scatter3([xMidArray(1:numLinesAlongWire)],[yMidArray(1:numLinesAlongWire)],[zMidArray(1:numLinesAlongWire)],100,BNormArray,'filled','MarkerEdgeColor','b');
+                  [z1Array(1:numLinesAlongWire); z2Array(numLinesAlongWire)], 'k');   
         p.LineWidth = 1;
-        %view(40, 35)
-        %handle = colorbar; 
+        handle = colorbar; 
     end
 
     if(plotTransverseLines > 0)
         for index = (numLinesAlongWire + 1):(numLinesAlongWire + numTransverse)
             plot3([x1Array(index); x2Array(index)], [y1Array(index); y2Array(index)], [z1Array(index); z2Array(index)], 'b');
-            %plot3([x1Array(index) x2Array(index)],[y1Array(index) y2Array(index)],[z1Array(index) z2Array(index)],'-o','Color','b','MarkerSize',4)
-            hold on;
         end
     end
 
 
 
     % Then the lines showing the field direction and magnitude
-
     BNormArray = sqrt(BLocalXArray.^2 + BLocalYArray.^2 + BLocalZArray.^2);
-
-    %lenLineAvg = sum(lenArray)/numLines;
-    %BAvg = sum(BNormArray)/numLines;
 
     BNormFactor = min(lenArray)./max(BNormArray);
 
@@ -131,11 +107,12 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
         xmin = 0; 
         xmax = 0; 
         numx = 1;
-        ymin = -RSol*2; 
-        ymax = RSol*2; 
-        numy = numPointsFieldMap;    
-        zmin = -RSol*0.6; 
-        zmax = RSol*0.6; 
+        
+        ymin = -RSol*2.1; 
+        ymax = RSol*2.1; 
+        numy = numPointsFieldMap;  
+        zmin = -RSol*0.61; 
+        zmax = RSol*0.61; 
         numz = numPointsFieldMap;
 
         disp('Plotting field map')
@@ -166,6 +143,9 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
             end
         end
 
+        norm = sqrt(u.^2 + v.^2 + w.^2); 
+        colormap(jet); 
+        quiverC3D(x, y, z, u, v, w, 'linewidth', 1); 
 
         % ***** Center B ***** 
         indexx = 1;
@@ -180,54 +160,33 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
         centerB = centerB_temp(round(length(centerB_temp)/2), 6);
         % ***** Center B ***** 
 
-
-
-        norm = sqrt(u.^2 + v.^2 + w.^2); 
-        colormap(jet); 
-        quiverC3D(x, y, z, u, v, w, 1); 
-        xlabel('x'); 
-        ylabel('y'); 
-        zlabel('z'); 
     end 
 
     currentScalingFactor = 0.5; 
     if(plotCurrent > 0) 
-        %IMax = max(abs(IArray)); 
         IMaxFactor = min(lenArray./abs(IArray)); 
 
         unitVector = [x2Array - x1Array, y2Array - y1Array, z2Array - z1Array] ...
             ./sqrt((x2Array - x1Array).^2 + (y2Array - y1Array).^2 + (z2Array - z1Array).^2);
-        %unitX = unitVector(:, 1).*IArray./IMax; 
-        %unitY = unitVector(:, 2).*IArray./IMax; 
-        %unitZ = unitVector(:, 3).*IArray./IMax; 
-
-        %unitX = unitVector(:, 1).*IArray; 
-        %unitY = unitVector(:, 2).*IArray; 
-        %unitZ = unitVector(:, 3).*IArray; 
 
         unitX = unitVector(:, 1).*IArray.*IMaxFactor; 
         unitY = unitVector(:, 2).*IArray.*IMaxFactor; 
         unitZ = unitVector(:, 3).*IArray.*IMaxFactor; 
 
-        %quiverC3D(x1Array,y1Array,z1Array,unitX,unitY,unitZ,'LineWidth',1,'MaxHeadSize',10);
-        hold off;
-        %quiverC3D(x1Array,y1Array,z1Array,unitX,unitY,unitZ,'LineWidth',1,'MaxHeadSize',10,'scale',0);
         quiver3(x1Array, y1Array, z1Array, unitX, unitY, unitZ, 'g');
-        hold on;
-
-        sPlot = surf(xPlot, yPlot, zPlot, colorPlot, 'FaceAlpha', conductorTransparency);
-        %sPlot.EdgeColor = 'none';
-        colormap('jet')
-        handle = colorbar; 
-        daspect([1, 1, 1]);
-        view(80, 15);
     end
 
+    sPlot = surf(xPlot, yPlot, zPlot, colorPlot, 'FaceAlpha', conductorTransparency); 
+    colormap('jet');
+    handle = colorbar; 
+    daspect([1, 1, 1]); 
+    view(80, 15);
+    
     axis([-maxSize, maxSize, -maxSize, maxSize, -RSol*0.6, RSol*0.6]);
     xlabel('{\it x} [m]');
     ylabel('{\it y} [m]');
     zlabel('{\it z} [m]');
     ylabel(handle, 'Temperature [K]');
     
-    
+    hold off; 
 end 
