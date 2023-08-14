@@ -5,8 +5,8 @@ figure(2)
    s3 = ' s';
 
 
-v = VideoWriter('Iarray_Isc_400mm15turntry2.mp4','MPEG-4');
-v.FrameRate = 2;
+v = VideoWriter('Iarray_Isc_5turn240mmallon.mp4','MPEG-4');
+v.FrameRate = 5;
 open(v);
 
 for k = 1:size(IArrayhistory,2)
@@ -29,6 +29,7 @@ for k = 1:size(IArrayhistory,2)
    xlim([1 length(IcArray)])
 ylabel('Current [A]')
    xlabel('Line element number [-]')
+   set(gcf,'position',[3 4 1500 1000])
    frame = getframe(gcf);
    writeVideo(v,frame);
 

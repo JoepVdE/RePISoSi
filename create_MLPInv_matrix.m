@@ -18,6 +18,7 @@ function MLPInv = create_MLPInv_matrix(MArray, numLines, numPoints, pointIndex1,
         if(pointPlusIndex < (numLines + numPoints))
             MLP(index, pointPlusIndex) = -1;
         end
+        
         if(pointMinIndex < (numLines + numPoints))
             MLP(index, pointMinIndex) = 1;
         end

@@ -43,18 +43,25 @@ index2 = round(length(VGroundVector)*9/10);
 
 for k = 1:size(VGroundVectorhistory,2)-1
 
-Ecoil(k) = 1e6*(mean(VGroundVectorhistory(1:round(length(VGroundVector)*1/5),k)) - mean(VGroundVectorhistory(round(length(VGroundVector)*4/5):end,k)))/(2*pi*0.12);
+%Ecoil(k) = 1e6*(mean(VGroundVectorhistory(1:round(length(VGroundVector)*1/5),k)) - mean(VGroundVectorhistory(round(length(VGroundVector)*4/5):end,k)))/(2*pi*0.12);
+Ecoil(k) = 1e6*(VGroundVectorhistory(1/10*(length(VGroundVector)),k)-VGroundVectorhistory(9/10*(length(VGroundVector)),k));
 end
-figure(4)
+figure(7)
 plot(tArrayhistory(1:length(Ecoil)),Ecoil)
 xlabel('time [s]')
 ylabel('E [\muV/m]')
 grid on
+xlim([1 400])
+
 figure(5)
 plot(tArrayhistory(1:length(centerBhistory)),centerBhistory)
+hold on
+plot(tArrayhistory(1:length(centerBhistory)),Pheatersave)
 xlabel('time [s]')
 ylabel('B [T]')
 grid on
+xlim([1 400])
+ylim([0 0.12]);
 figure(6)
 plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingBottomhistory)
 hold on
@@ -63,6 +70,8 @@ grid on
 xlabel('time [s]')
 ylabel('T [K]')
 legend('T_{bottomlead}','T_{toplead}')
+xlim([1 400])
+
 
 
 % N = 31    ;

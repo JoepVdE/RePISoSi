@@ -1,6 +1,8 @@
 function [MArray, LTotal] = generate_inductance_matrix(numLines, numLinesAlongWire, wCond, thCond, ... 
     x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ... 
     mutualInductanceSpaceRatio, mutualInductanceSpaceRatioLimit, ignoreMutualInductancesTransverseElements) 
+    mu0 = pi*4E-7; %[H/m]
+
 
     xMidArray = 0.5*(x1Array + x2Array);
     yMidArray = 0.5*(y1Array + y2Array);
@@ -79,7 +81,7 @@ function [MArray, LTotal] = generate_inductance_matrix(numLines, numLinesAlongWi
                 v1 = [xDiffArray(index), yDiffArray(index), zDiffArray(index)];
                 v2 = [xDiffArray(index2), yDiffArray(index2), zDiffArray(index2)]; 
 
-                MArray(index, index2) = 1e-7*dot(v1, v2)*rInv; 
+                MArray(index, index2) = mu0*dot(v1, v2)*rInv/(4*pi); 
             end
         end
 
