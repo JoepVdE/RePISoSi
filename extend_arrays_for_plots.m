@@ -4,6 +4,7 @@ function [xPlot, yPlot, zPlot] = extend_arrays_for_plots(numPoints, ...
     xArrayExtended = zeros((numPoints - 1)*numThermalSubdivisions + 1, 1);
     yArrayExtended = zeros((numPoints - 1)*numThermalSubdivisions + 1, 1);
     zArrayExtended = zeros((numPoints - 1)*numThermalSubdivisions + 1, 1);
+	
 
     for index1 = 1:numPoints-1
         xArrayLocal = linspace(x1Array(index1), x2Array(index1), numThermalSubdivisions + 1);

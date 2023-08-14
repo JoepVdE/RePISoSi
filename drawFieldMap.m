@@ -2,7 +2,7 @@ function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongW
     temperatureArray, mutualInductanceSpaceRatio, IArray) 
     % drawFieldMap is a script relying on the parameters specified in run
     % script 
-    fig = figure(1)
+    fig = figure(1);
     clf(fig); 
     set(gcf, 'color', 'w'); 
     set(gcf,'position',[3 4 1500 1000])

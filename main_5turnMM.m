@@ -15,35 +15,40 @@ format long
 HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
 writedata = 1; %write output file 1 = yes 0 = no
+writevideo = 0;
 
-Description = '15turn4431A_AllOn_1Ktimestepvideo_30VHeater';
+Description = '15turn4431A_80VHeater_allon';
 FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
 
 if writedata ==1
 fileID = fopen(FileName,'w');
 end
+
+if writevideo ==1 
 v = VideoWriter(append(Description,'.mp4'),'MPEG-4');
 v.FrameRate = 5;
 open(v);
+end
 
 
 Helium_cooling = 1; %1 is on, 0 is off.
-copper_heat = 0; %1 is on, 0 is off.
-copper_conduction = 0;%1 is on, 0 is off.
+copper_heat = 1; %1 is on, 0 is off.
+copper_conduction = 1;%1 is on, 0 is off.
 
 
 toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
 theater = [1.633,5.478,10.304,15.42,19.826]; %[s]   time in between heating pulses
 RHeater = 350; % resistance of heater [Ohm]
-VHeater = 30; % voltage over heater V
-%Vheater = 20;
+VHeater = 80; % voltage over heater V
+
 PHeater = VHeater.^2/RHeater;
-%PHeater = 18; %[W]
-dTMax = 2;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
+
+dTMax = 1;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
 
 
 initial_temperature = 20; % Initial temperature of 10 K
 temperature_helium = initial_temperature; %[K]
+k_helium = conductivity_helium(temperature_helium);
 
 % ***** Solenoid properties ***** 
 RSol = 0.12;                 % Solenoid radius (m)
@@ -189,7 +194,7 @@ temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)
 
 
 % ***** Turn-to-turn resistance ***** 
-%.
+
 
 arclengthCylinder = 2*pi*RSol;
 widthWall = 0.005;          %m        
@@ -248,18 +253,26 @@ disp('Transient calculation');
 maxIteration = 50000; % Number of iterations 
 updateCounter = floor(maxIteration/100);
 
-drawFigureAtIteration = 1; % (yes 1, no 0)
+drawFigureAtIteration = 20; % How many iterations go by before a plot is made.
 
-s.MLPInv = MLPInv;      
+s.MLPInv = MLPInv;     
 
-timeOdeNext = now*24*3600;
-timeOdePrevious = timeOdeNext;
-timeTemperatureNext = now*24*3600;
-timeTemperaturePrevious = timeTemperatureNext;
-timeMaterialCalculationNext = now*24*3600;
-timeMaterialCalculationPrevious = timeMaterialCalculationNext;
-timeLastIteration = now*24*3600;
-timeNextIteration = now*24*3600;
+temperatureCalculationStartTime = now*24*3600;
+temperatureCalculationFinishTime = now*24*3600;
+materialsPropsCalculationStartTime = now*24*3600;
+materialsPropsCalculationFinishTime = now*24*3600;
+ODECalculationStartTime = now*24*3600;
+ODECalculationFinishTime = now*24*3600;
+
+plottingStartTime = now*24*3600;
+plottingFinishTime = now*24*3600;
+
+
+overallFinishTime = now*24*3600;
+overallStartTime = now*24*3600;
+overallFirstStartTime = now*24*3600;
+
+
 
 
 centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire,numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
@@ -272,24 +285,18 @@ t = 0; % Initial time (s)
         temperatureRingBottom = temperatureRing;
 % Linearized model to calculate quench propagation 
 for iterationIndex = 1:maxIteration       
-    timeNextIteration = now*24*3600; % Time stamp in seconds 
+
+    overallStartTime = now*24*3600;
+	materialsPropsCalculationStartTime = now*24*3600;
     
 
-    %Calculate fraction of time spent in each operation
-    fracODE = 100*(timeOdeNext - timeOdePrevious)./(timeNextIteration - timeLastIteration); 
-    fracTSteps = 100*(timeTemperatureNext - timeTemperaturePrevious)./(timeNextIteration - timeLastIteration);
-    fracMatCalc = 100*(timeMaterialCalculationNext - timeMaterialCalculationPrevious)./(timeNextIteration - timeLastIteration); 
-
-    disp(sprintf("Index: %0.0f, time expired: %0.1f s, tsim %0.6g s, last iteration %0.1f s (%0.0f%% in ODE, %0.0f%% in TSteps, %0.0f%% in material calc)",iterationIndex, toc, t, timeNextIteration-timeLastIteration, fracODE, fracTSteps, fracMatCalc));   
-    timeLastIteration = timeNextIteration;
-    
+        
     externaldIdtVector = zeros(numPoints - 1, 1);
     
     % Current flows out of the last point
     s.externalVoltagedIdtVector = zeros(numPoints - 1, 1);
 
-    % Material property calculation		
-    timeMaterialCalculationPrevious = now*24*3600;  % (s) 
+    % Material property calculation		    
     
     %thermalConductivityArray = thermal_conductivity_Al10SiMg(temperatureArray); % (W/(m*K)) 
     %thermalConductivityArray = thermal_conductivity_al_alloy_5083(temperatureArray); % (W/(m*K)) 
@@ -306,7 +313,9 @@ for iterationIndex = 1:maxIteration
     resistivityNormalArray = rhomatrix;
 
 
-    %heatCapacityArray= heat_capacity_al_alloy_5083(temperatureArray, volumeArray(1,1)); %assuming every element has the same volume
+    % Materials calculation starts here
+	
+	
 
     heatCapacityArray= heat_capacity_al_alloy_5083(temperatureArray, volumeArray);
 
@@ -328,6 +337,14 @@ for iterationIndex = 1:maxIteration
  %   IcArray(1:round(length(IcArray)/5)) = 15000; 
   %  IcArray(round(4*length(IcArray)/5):end) = 15000;
     IcArrayhistory(:,iterationIndex) = IcArray;
+	
+	% Materials props calculation stops here and temperature part starts
+	materialsPropsCalculationFinishTime = now*24*3600;
+	
+	
+	%disp(sprintf("Materials calculation time: %0.3f s", materialsPropsCalculationFinishTime-materialsPropsCalculationStartTime));   
+	
+	temperatureCalculationStartTime = now*24*3600;
 
 
 
@@ -438,10 +455,8 @@ for iterationIndex = 1:maxIteration
     end
 
 
-    timeMaterialCalculationNext = now*24*3600;
-
-    % Thermal part
-    timeTemperaturePrevious = now*24*3600;	
+    
+    
 
     dtInt = 0;
     
@@ -490,17 +505,19 @@ for iterationIndex = 1:maxIteration
 
         QringToparray = (temperatureArray(end+1-numPointsPerTurn:end,:) - temperatureRingTop).*(thermalConductivityArray(end+1-numPointsPerTurn:end,:)).*lenArrayAlongWireElements(end+1-numPointsPerTurn:end,:)*thCond./(0.5.*wCond);
 
-        k_heliumarray = conductivity_helium(temperature_helium)*ones(size(temperatureArray,1),size(temperatureArray,2));
+        Qheliumcoolingarray(:,:) = 0;
+        if Helium_cooling == 1
+            k_heliumarray = k_helium*ones(size(temperatureArray,1),size(temperatureArray,2)); %helium temperature constant
 
-        h_helium_array = Nu*k_heliumarray./L_helium; %solving heat transfer coefficient from Nusselt number
+            h_helium_array = Nu*k_heliumarray./L_helium; %solving heat transfer coefficient from Nusselt number
 
-        R_thermal = 0.5*thCond./(thermalConductivityArray)+1./h_helium_array; %Thermal resistance, including heat conductivity
-        
-        Qheliumcoolingarray = 2.*cooling_area_correction_factor*A_helium.*(temperatureArray-temperature_helium)./R_thermal; %(area from 2 sides)
-        
+            R_thermal = 0.5*thCond./(thermalConductivityArray)+1./h_helium_array; %Thermal resistance, including heat conductivity
 
-        if Helium_cooling == 0
-            Qheliumcoolingarray(:,:) = 0;
+            Qheliumcoolingarray = 2.*cooling_area_correction_factor*A_helium.*(temperatureArray-temperature_helium)./R_thermal; %(area from 2 sides)
+
+
+
+
         end
 
 
@@ -556,9 +573,14 @@ for iterationIndex = 1:maxIteration
     temperatureRingTophistory(:,iterationIndex) =   temperatureRingTop;
     temperatureRingBottomhistory(:,iterationIndex) = temperatureRingBottom;
     temperaturemax(iterationIndex) = max(temperatureArray(:));
-    % *****
-    % Material property calculation
-    timeTemperatureNext = now*24*3600; 
+    
+	
+	% Temperature part stops here and ODE part starts
+	temperatureCalculationFinishTime = now*24*3600;
+	%disp(sprintf("Temperature calculation time: %0.3f s", temperatureCalculationFinishTime-temperatureCalculationStartTime));   
+	ODECalculationStartTime = now*24*3600;
+	
+	
 
     % Construction of vector b in Av = b
     % The vector comprises all dI/dt followed by all voltage points, excluding
@@ -584,7 +606,6 @@ for iterationIndex = 1:maxIteration
 
     tspan = [t, (t + dt)];      
     
-    timeOdePrevious = timeOdeNext;
     myfun = @(t, IArray)myODE(t, IArray, s); 
     % [tArchive, IArrayArchive] = ode23tb(myfun, tspan, IArray0); % Function ode23tb solves stiff differential equations, low order method 
  %   [tArchive, IArrayArchive] = ode23s(myfun, tspan, IArray0); %GOOD ONE
@@ -604,16 +625,21 @@ for iterationIndex = 1:maxIteration
 
     Qheliumcoolingarrayhistory(:,:,iterationIndex) = Qheliumcoolingarray;
     VGroundVectorhistory(:,iterationIndex) = VGroundVector;
-    Efield(iterationIndex) = 1e6*(VGroundVector(round(length(VGroundVector)*1/10))-VGroundVector(round(length(VGroundVector)*9/10)))./(4*2*pi*0.12);
+    Efield(iterationIndex) = 1e6*(VGroundVector(round(length(VGroundVector)*1/10))-VGroundVector(round(length(VGroundVector)*9/10)))./(4*2*pi*0.12); % Be very careful with these variables
 
-    timeOdeNext = now*24*3600;
+    % ODE part finishes here and plotting part starts
+	ODECalculationFinishTime = now*24*3600;	
+	%disp(sprintf("ODE calculation time: %0.3f s", ODECalculationFinishTime-ODECalculationStartTime));   
+	
+	
+	plottingStartTime = now*24*3600;
 
     % Local magnetic flux density (T)
     BLocalXArray = BiotSavartMatrixX*IArray; 
     BLocalYArray = BiotSavartMatrixY*IArray; 
     BLocalZArray = BiotSavartMatrixZ*IArray; 
 
-    if(mod(iterationIndex,drawFigureAtIteration) == 0)
+    if(mod(iterationIndex+1,drawFigureAtIteration) == 0)
         
         centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numTransverse,numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
             x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
@@ -622,15 +648,16 @@ for iterationIndex = 1:maxIteration
         pause(0.1) 
         figure(1);
         hold on
+
+        if writevideo ==1
         frame = getframe(gcf);
         writeVideo(v,frame);
+        end
+
         hold off
-    end 
-    
-    
-    centerBhistory(iterationIndex) = centerB;
+            centerBhistory(iterationIndex) = centerB;
     figure(2)
-    plot(tArrayhistory,centerBhistory,Color='b',Marker='.',MarkerSize=10,LineStyle='-')
+    plot(tArrayhistory(centerBhistory>0),centerBhistory(centerBhistory>0),Color='b',Marker='.',MarkerSize=10,LineStyle='-')
     xlabel('t [s]')
     ylabel('B_{center} [T]')
     grid on
@@ -640,18 +667,43 @@ for iterationIndex = 1:maxIteration
     xlabel('t [s]')
     ylabel('E_{field} [\muV/m]')
     grid on
+    end 
+    
+    
+
     %dIdt = myODE(t, IArray, s);
+	
+	% Plotting part finishes here
+	plottingFinishTime = now*24*3600;	
+	%disp(sprintf("Plotting time: %0.3f s", plottingFinishTime-plottingStartTime));   
+	overallFinishTime = now*24*3600;
+	%disp(sprintf("Overall time: %0.3f s", overallFinishTime-overallStartTime));   
+	
+	
+	    %Calculate fraction of time spent in each operation
+    fracMatCalc = 100*(materialsPropsCalculationFinishTime - materialsPropsCalculationStartTime)./(overallFinishTime - overallStartTime); 
+	fracTSteps = 100*(temperatureCalculationFinishTime - temperatureCalculationStartTime)./(overallFinishTime - overallStartTime);
+	fracODE = 100*(ODECalculationFinishTime - ODECalculationStartTime)./(overallFinishTime - overallStartTime); 
+	fracPlotting = 100*(plottingFinishTime - plottingStartTime)./(overallFinishTime - overallStartTime);    
+    
+
+    disp(sprintf("Index: %0.0f, time expired: %0.1f s, tsim %0.6g s, last iteration %0.1f s (%0.3f%% in material calc, %0.3f%% in TSteps, %0.3f%% in ODE, %0.3f%% plotting)",iterationIndex, overallFinishTime-overallFirstStartTime, t, overallFinishTime-overallStartTime, fracMatCalc, fracTSteps, fracODE, fracPlotting));   
+
     
     if writedata ==1
-    fprintf(fileID,'%0.6g, %0.6f, %0.3f, %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerBhistory(1,end) Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
+    fprintf(fileID,'%0.6g, %0.6f, %0.3f, %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerB Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
     end
+	
 
 end 
 
 if writedata ==1
 fclose(fileID);
 end
+
+if writevideo ==1
 close(v);
+end
 save(append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.mat'))
 toc       
     

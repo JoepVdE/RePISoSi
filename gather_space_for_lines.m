@@ -1,7 +1,6 @@
 function [x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, pointIndex1, pointIndex2] = gather_space_for_lines(numLinesAlongWire, numTransverse, numLines, numPointsPerTurn, xArray, yArray, zArray, resolution) 
 
 
-
 % Initialize coordinates around the conductor 
 x1Array = zeros(numLines, 1);
 x2Array = zeros(numLines, 1);
@@ -79,14 +78,12 @@ end
 
 
 
-spacing =resolution;
+spacing =resolution; % Number of unconnected lines between shorts
 for index = 1:numTransverse
-    %spacing = (Ratio_odd_integer+1);
     
     indexRef = index + numLinesAlongWire;
-    x1Array(indexRef) = xArray(spacing*(index-1)+1); 
-    index
-    spacing*(index-1) + numPointsPerTurn+1
+    x1Array(indexRef) = xArray(spacing*(index-1)+1);   
+    
     x2Array(indexRef) = xArray(spacing*(index-1) + numPointsPerTurn+1);   % Off-by-one-turn 
     y1Array(indexRef) = yArray(spacing*(index-1)+1);
     y2Array(indexRef) = yArray(spacing*(index-1) + numPointsPerTurn+1);   % Off-by-one-turn

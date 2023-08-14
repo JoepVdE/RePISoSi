@@ -14,59 +14,55 @@ set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
 format long
 HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
 I0 = 4431;                    % Driving current (A)  test2AnnaJoep
-writedata = 1; %write output file 1 = yes 0 = no
+writedata = 0; %write output file 1 = yes 0 = no
 
-Description = '5turn4431A_CoolingCopperConductionnoHeat_1Ktimestep';
+Description = '5turnallesaanlaatstekeer';
 FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
 
 if writedata ==1
 fileID = fopen(FileName,'w');
 end
 v = VideoWriter(append(Description,'.mp4'),'MPEG-4');
-v.FrameRate = 2;
+v.FrameRate = 5;
 open(v);
 
 
 Helium_cooling = 1; %1 is on, 0 is off.
-copper_heat = 0; %1 is on, 0 is off.
+copper_heat = 1; %1 is on, 0 is off.
 copper_conduction = 1;%1 is on, 0 is off.
 
 
-toffset = [8.071,48.795,70.456,84.040,69.285,100] - 8.071; % [s] time heater is on
+toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
 theater = [1.633,5.478,10.304,15.42,19.826]; %[s]   time in between heating pulses
 RHeater = 350; % resistance of heater [Ohm]
 VHeater = 80; % voltage over heater V
 %Vheater = 20;
 PHeater = VHeater.^2/RHeater;
 %PHeater = 18; %[W]
-dTMax = 1;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
-initial_temperature = 20; % Initial temperature of 4 K
-pressure_cryostat = 0.15; %bar
+dTMax = 2;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
+
+
+initial_temperature = 20; % Initial temperature of 10 K
 temperature_helium = initial_temperature; %[K]
 
 % ***** Solenoid properties ***** 
 RSol = 0.12;                 % Solenoid radius (m)
-N_shorts = 19;               % Number of shorts per turn
-%N_shorts = 32;               % Number of shorts per turn
+%N_shorts = 19;               % Number of shorts per turn
+N_shorts = 5;
 
 arclengthSlot = 4*10^(-2);      % arclength of slot (m)
-arclengthShort = 3.7*10^(-3);     %arclength of short (m)
-%Ratio_slot_short = arclengthSlot/arclengthShort; %ratio between slot and short size
-%Ratio_odd_integer = floor((Ratio_slot_short)/2)*2+1; %closest odd integer of ratio
-%numPointsPerTurn = (Ratio_odd_integer+1)*N_shorts-(Ratio_odd_integer+1)/2;       % Sets the resolution 
-%Ratio_odd_integer = 3;
+thSlot = 3.7*10^(-3);     %arclength of short (m)
 
-resolution = 4; % number of lines between axial shorts, must be even
+resolution = 2; % number of lines between axial shorts, must be even
 resolution = round(resolution/2)*2; %force to be even
 
-numPointsPerTurn = N_shorts*resolution-resolution/2; %make resolution such that shorts are such that they maximalise the axial resistance
+numPointsPerTurn = N_shorts*resolution-resolution/2; %make resolution such that shorts are such that they maximalise the axial resistance (off by one turn)
 
-wCond = 0.0085;              % Conductor width (m) %todo
+wCond = 0.0085;              % Conductor width (m) 
 thReBCO = 2.2E-6;            %thickness ReBCO layer (m)
-thCond = 0.0038;             % Effective conductor thickness (m), 
+thCond = 0.0038;             % Effective conductor thickness (including Al stabiliser) (m), 
                              % 3.8 mm = 1.5 mm * 5 mm + 4.5 mm * 3 mm + 1.5 mm * 5 mm)/(1.5 mm + 4.5 mm + 1.5 mm)   
 
-thSlot = 0.0037;              % Slot thickness (m)
 thWallatShort = 5e-3; %[m] thickness of the short wall in between slots. 
 heightSlot = 1e-3; %[m] 
 ACond = wCond.*thCond;       % Cross-sectional area of the conductor (m)        is actually 7.5 mm but needs to be 8.5 here to include the 1 mm gap
@@ -76,7 +72,7 @@ len = numWindings*(wCond + thSlot);     % Length of a solenoid (m)
 
 ignoreMutualInductancesTransverseElements = 0; % (yes = 1, no = 0)
 numThermalSubdivisions = 3;  % Number of subdivisions
-temperatureSubSteps = 100;   % Number of temperature timesteps per magnetic timestep 
+temperatureSubSteps = 200;   % Number of temperature timesteps per magnetic timestep 
 
 
 
@@ -98,11 +94,9 @@ massRing = ARing*thRing*rhoCopper; %[kg]
 temperatureRing = initial_temperature; %[K]
 
 RingRRR = 160; %[-] Ekin for annealed OFE copper. Normal copper RRR~110, not ennealed OFE RRR~45
+
+
 % ***** Superconducting cable properties ***** 
-
-
-
-
 N_tapes = 4;
 tapewidth = 4E-3; %[m]
 SCthickness = 2.2E-6; %[m]
@@ -112,9 +106,7 @@ SCthickness = 2.2E-6; %[m]
 % ***** Look up tables ***** 
 Tinitialise = 0.1:0.1:400;
 L = 2.44E-8; %[V^2K^-2]
-%ktable = 1E6.*Tinitialise.*L./BlochGrun(Tinitialise,0.2594,484,0.026,5);
-%rhotable = BlochGrun(Tinitialise,0.2594,484,0.026,5)/1E6;
- %BlochGrun(x,A,thetaR,z,n)
+
 ktable = 1E6.*Tinitialise.*L./BlochGrun(Tinitialise,0.24233,432.43,0.0247015,5);
 rhotable = BlochGrun(Tinitialise,0.24233,432.43717,0.0247015,5)/1E6;
 % ***** 
@@ -138,13 +130,11 @@ mutualInductanceSpaceRatioLimit = 1000;
 numPoints = floor(numPointsPerTurn*numWindings + 1);            % Total number of 3D points
 numThermalElements = (numPoints - 1)*numThermalSubdivisions;    % Total number of thermal elements
 
-
-
 numLinesAlongWire = numPoints - 1; 
 
 dIdt = zeros(numLinesAlongWire,1); %initial dIdt
 %numTransverse = floor((numWindings - 1)*numPointsPerTurn + 1); 
-numTransverse = floor((numWindings - 1)*N_shorts + 1)-round((numWindings/2)); %It has 0.5 turn leftover each round. That's why
+numTransverse = floor((numWindings - 1)*N_shorts + 1)-round((numWindings/2)); %It has 0.5 turn leftover each round because shorts spacing is off by one turn. That's why
 numTransverse = max(numTransverse, 0); 
 numLines = numLinesAlongWire + numTransverse; 
 
@@ -160,13 +150,6 @@ IArrayTrans = zeros(numTransverse-1,1);
 [x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, pointIndex1, pointIndex2] = ... 
     gather_space_for_lines(numLinesAlongWire, numTransverse, numLines, numPointsPerTurn, xArray, yArray, zArray, resolution); 
 
-
-% Put position of each turn in xArray. However, is not superocnducting. 
-% for indexx = length(xArray)+1:length(x1Array)
-%     xArray(indexx) = 0.5*(x1Array(indexx)+ x2Array(indexx));
-%     yArray(indexx) = 0.5*(y1Array(indexx)+ y2Array(indexx));
-%     zArray(indexx) = 0.5*(z1Array(indexx)+ z2Array(indexx));
-% end
 
 
 % Coordinates for plotting 
@@ -202,51 +185,43 @@ IArray(1:numLinesAlongWire) = I0; % Current is only induced along the line
 
 
 % ***** Initial conditions of the magnet ***** 
-%initial_temperature = 77; % Initial temperature of 77 K
 temperatureArray = ones(numPoints - 1, numThermalSubdivisions)*initial_temperature;  
-%temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 10; % Hotspot 10 K
-temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 22; % Hotspot 100 K
+temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 22; % Hotspot 22 K
 
 
 % ***** Turn-to-turn resistance ***** 
-% The vector comprises all dI/dt followed by all voltage points, excluding
-% point 1, which is per definition always at 0 V. 
+
 
 arclengthCylinder = 2*pi*RSol;
 widthWall = 0.005;          %m        
-%numShorts = floor(arclengthCylinder/(arclengthShort+arclengthSlot));
-%axialshortResistance = heightSlot*rhotable(round(initial_temperature*10))/(arclengthShort*widthWall); % Turn-to-turn resistance (ohm)|8.267091125040324e-08 : used to be 1e-6
+
+
+% ***** Helium gas cooling characteristics ***** 
+
 A_helium = (wCond-heightSlot).*lenArrayAlongWireElements; %characteristic length for natural convection
 L_helium = 0.5.*((wCond-heightSlot)+lenArrayAlongWireElements);
-
-
 Nu = 4.36; %Nusselt number for steady laminar pipe flow
-%thSlot = 1mm, arclenghtshort = 3.7 mm, 
 
-%RArrayTrans = ones(numTransverse, 1)*Inf; % Transverse resistance array (ohm) test not working
-%RArrayTrans(1:Ratio_odd_integer+1:numTransverse) = axialshortResistance;
-
-%RArrayTrans = ones(numTransverse, 1)*axialshortResistance;
-
-%RArrayTrans = turnToTurnResistance/numPointsPerTurn; % Transverse resistance array (ohm) 
-%
 
 volumeArray = (lenArray(1:numLinesAlongWire)./numThermalSubdivisions ... 
     .*thCond*wCond)*ones(1, numThermalSubdivisions);
 Acylinder = 2*2*pi*RSol*(wCond-heightSlot)*numWindings;
-Aslots = 2*numTransverse*arclengthSlot*thWallatShort;
+Aslots = 2*numTransverse*thSlot*thWallatShort;
 
 Atotal = Acylinder+Aslots;
 cooling_area_correction_factor = Atotal/Acylinder;
 
+
+
+% The vector comprises all dI/dt followed by all voltage points, excluding
+% point 1, which is per definition always at 0 V
 V_local_element = zeros(numLinesAlongWire,1);
 VGroundVector = zeros(numLinesAlongWire,1);
 
 % ***** 
 
 IExt = I0; % External current 
-%edit
-%IArray(1:numLinesAlongWire) = I0; % Initial current 
+
 if writedata ==1
 fprintf(fileID,'Input Parameters RePISoSi code: \n \n');
 fprintf(fileID,'Initial Current: %.0f [A]\n', I0);
@@ -331,50 +306,37 @@ for iterationIndex = 1:maxIteration
     rhomatrix = rhotable(rounded(:,:));
     resistivityNormalArray = rhomatrix;
 
-    %heatCapacityArray = heat_capacity_al_alloy_5083(temperatureArray, sum(volumeArray(:))); 
-    % heatCapacityArray = heat_capacity_al_alloy_5083(temperatureArray, volumeArray); 
-    % 
+
     %heatCapacityArray= heat_capacity_al_alloy_5083(temperatureArray, volumeArray(1,1)); %assuming every element has the same volume
 
     heatCapacityArray= heat_capacity_al_alloy_5083(temperatureArray, volumeArray);
-    %sum(volumeArray,2)
 
 
-    %checkresistivityarray(:,:,iterationIndex) = resistivityNormalArray;
-    %checkheatconductivityarray(:,:,iterationIndex) = thermalConductivityArray;
 
-    %IcArray = calc_HTS_critical_current(temperatureArray, Ic0, Tc); % (A) 
+
     BXYZarray = [BLocalXArray BLocalYArray BLocalZArray]; %matrix of magnetic field direction at each point every row with columns 1,2,3 describing x,y,z coordinates respectively
     XYZarray =  [xArray yArray zArray];                   %matrix of cartesian coordinates of each point in every row with column  1,2,3 describing x,y,z coordinates respectively
     %BArray = sqrt(BLocalXArray.^2+BLocalYArray.^2+BLocalZArray.^2);
     BArray = vecnorm(BXYZarray,2,2); %length of vector corresponding to magnitude B-field, same as above
 
-    %switch to cylindrical coordinates, not needed
-    %BLocalrArray = sqrt(BLocalXArray.^2+BLocalYArray.^2); 
-    %BLocalthetaArray = atan(BLocalYArray./BLocalXArray);
     
     CaxistapeArray = [xArray yArray zeros(length(xArray),1)];
 
     theta_angleArray = acos(dot(BXYZarray(1:length(CaxistapeArray),:),CaxistapeArray,2)./(BArray(1:length(CaxistapeArray)).*vecnorm(CaxistapeArray,2,2))); %angle in rad between coordinate vector at each point on cylinder, but with z=0, so parallel to the c-axis of the rebco tape and the magnetic field 
-    %theta_degreeArray = theta_angleArray*180/pi;
 
     maxTemparray = max(temperatureArray,[],2); %always get the highest temperature in the finer temperature scale
     IcArray = N_tapes*tapewidth*1e3*SCthickness*1e3*parametrisation_fujikura(BArray(1:length(temperatureArray)),maxTemparray,theta_angleArray(1:length(temperatureArray)));
- %   IcArray(1:round(length(IcArray)/5)) = 15000;
+ %   IcArray(1:round(length(IcArray)/5)) = 15000; 
   %  IcArray(round(4*length(IcArray)/5):end) = 15000;
     IcArrayhistory(:,iterationIndex) = IcArray;
 
 
-%     turnToTurnResistance = turnToTurnResistance; % TODO: Must be updated if temperature changes  
-%     
-%     RArrayTrans = turnToTurnResistance/numPointsPerTurn; % Transverse resistance array (ohm) 
-    %RArrayTrans(1:Ratio_odd_integer+1:numTransverse) = axialshortResistance;
 
 
     temperatureBottomArray =  temperatureArray(1:resolution:(numTransverse-1)*resolution,1); %temperature at bottom element of axial short
     temperatureTopArray = temperatureArray(numPointsPerTurn+1:resolution:(numTransverse-1)*resolution+numPointsPerTurn,1);
     temperatureshort = (temperatureBottomArray+temperatureTopArray)/2;
-    axialshortResistance = heightSlot*rhotable(round(temperatureshort*10))/(arclengthShort*widthWall); % Turn-to-turn resistance (ohm)|8.267091125040324e-08 : used to be 1e-6
+    axialshortResistance = heightSlot*rhotable(round(temperatureshort*10))/(thSlot*widthWall); % Turn-to-turn resistance (ohm)|8.267091125040324e-08 : used to be 1e-6
     axialshortResistance = transpose(axialshortResistance);
 
     RArrayTrans = axialshortResistance;
@@ -394,18 +356,6 @@ for iterationIndex = 1:maxIteration
 
     
   
-
-%x = zeros(10,1);
-%parfor
-
-% L_self = MArray(sub2ind(size(MArray),1:size(MArray,1),1:size(MArray,2)))'; %get self inductance from mutual inductance matrix [H]
-% 
-% RArraytrans2 = zeros(numLinesAlongWire,1);
-% RArraytrans2(1:5:numLinesAlongWire) = RArrayTrans(1:end-1);
-% 
-% 
-% IArraytrans2 = zeros(numLinesAlongWire,1);
-% IArraytrans2(1:5:numLinesAlongWire) = IArrayTrans(1:end);
 % 
 
 %V_local_element = MArray(1:numLinesAlongWire,1:numLinesAlongWire) * dIdt;
@@ -535,7 +485,7 @@ for iterationIndex = 1:maxIteration
 
 
 
-        Qaxialarray = (temperatureTopArray - temperatureBottomArray) .* 0.5.* (thermalConductivityBottomArray + thermalConductivityTopArray).*arclengthShort.*thWallatShort./heightSlot;
+        Qaxialarray = (temperatureTopArray - temperatureBottomArray) .* 0.5.* (thermalConductivityBottomArray + thermalConductivityTopArray).*thSlot.*thWallatShort./heightSlot;
 
         QringBottomarray = (temperatureArray(1:numPointsPerTurn,:) - temperatureRingBottom).*(thermalConductivityArray(1:numPointsPerTurn,:)).*lenArrayAlongWireElements(1:numPointsPerTurn,:)*thCond./(0.5.*wCond); %approximation that local thermal conductivity of aluminium is limiting the heat flow to copper and that copper stays at constant temperature. Also, the thermal conductivity is calculated as the conductivity as if the heat would travel axially through an aluminium thickness of half a turn. Contact resistance to copper is neglected.
 
