@@ -1,11 +1,24 @@
-function rhoCu = rhoCu_nist(T,B,RRR,f_MR)
-% T : Vector of temperatures in each cable
-% B : Vector of magnetic field in each strand of each cables
-% RRR : Vector of RRR of each cable
-% f_MR : (optional) Factor to scale the magneto-resistivity (default=1)
-if nargin<4
-    f_MR=1; % default, no change of the magneto-ressitivity
-end
+% -------------------------------------------------------------------------
+%  rhoCu_nist.m  --  NIST cryogenic resistivity of OFHC copper, including
+%                    a magneto-resistance correction (Kohler-rule fit).
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Inputs:
+%      T    : temperature (K)         (scalar or vector)
+%      B    : magnetic flux density (T) (scalar or vector)
+%      RRR  : residual resistivity ratio (-) (scalar or vector)
+%      f_MR : optional scaling factor for the magneto-resistivity (default 1)
+%
+%  Output:
+%      rhoCu : resistivity (Ohm*m), broadcast to the largest input shape.
+% -------------------------------------------------------------------------
+function rhoCu = rhoCu_nist(T, B, RRR, f_MR)
+    if nargin < 4
+        f_MR = 1;   % default: no scaling of magneto-resistivity
+    end
 
 % % % If one of T, B, and RRR is given as a vector and one of two of the others are not, make them vectors with as many elements
 if length(T)>=length(B) && length(T)>=length(RRR)

@@ -1,8 +1,20 @@
-function [BiotSavartMatrixX, BiotSavartMatrixY, BiotSavartMatrixZ, BLocalXArray, BLocalYArray, BLocalZArray] ... 
-    = calc_biot_savart(numLines, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, IArray, mutualInductanceSpaceRatio)
-    % ***** Biot-Savart calculations ***** 
-    % The special case of a uniform constant current I (current is out from the integral)
-    disp("Biot-Savart Geometry calculation");
+% -------------------------------------------------------------------------
+%  calc_biot_savart.m  --  Build the per-line Biot-Savart matrices and
+%                          evaluate the local magnetic flux density.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Self-field of the conductor element on itself is ignored. Mutual fields
+%  are integrated by uniform sub-segmenting whenever the centre-to-centre
+%  distance falls below mutualInductanceSpaceRatio * element length.
+% -------------------------------------------------------------------------
+function [BiotSavartMatrixX, BiotSavartMatrixY, BiotSavartMatrixZ, ...
+          BLocalXArray, BLocalYArray, BLocalZArray] = calc_biot_savart( ...
+            numLines, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+            IArray, mutualInductanceSpaceRatio)
+    disp("Biot-Savart geometry calculation");
     f = waitbar(0, 'Biot-Savart Geometry calculation');
     
     updateCounter = floor(numLines/100);

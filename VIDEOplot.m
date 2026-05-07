@@ -1,78 +1,48 @@
-figure(2)
+% -------------------------------------------------------------------------
+%  VIDEOplot.m  --  Build an MP4 of I(t) and Ic(t) per line element.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Required workspace variables:
+%      IArrayhistory, IcArrayhistory, IcArray, tArrayhistory.
+%
+%  Output: Iarray_Isc_5turn240mmallon.mp4 in the current working directory.
+%
+%  TODO: parameterize the output filename / frame rate / y-axis limits.
+% -------------------------------------------------------------------------
 
-    set(gcf,'Color','w')
-   s1 = 't = ';
-   s3 = ' s';
+VIDEO_FILENAME = 'Iarray_Isc_5turn240mmallon.mp4';   % TODO: parameterize
+FRAME_RATE     = 5;
+YLIM_CURRENT_A = [-4000, 8000];
 
+figure(2);
+set(gcf, 'Color', 'w');
+set(gcf, 'Position', [3, 4, 1500, 1000]);
 
-v = VideoWriter('Iarray_Isc_5turn240mmallon.mp4','MPEG-4');
-v.FrameRate = 5;
+v = VideoWriter(VIDEO_FILENAME, 'MPEG-4');
+v.FrameRate = FRAME_RATE;
 open(v);
 
-for k = 1:size(IArrayhistory,2)
-    % if tArrayhistory(k) > 11
-    %     break
-    % end
+cleanupV = onCleanup(@() close(v));   % ensure handle is closed even on error
 
+for k = 1:size(IArrayhistory, 2)
+    titleString = sprintf('t = %s s', num2str(tArrayhistory(k), 3));
 
-   titlestring = strcat(s1,num2str(tArrayhistory(k),3),s3);
+    plot(IArrayhistory(:, k));
+    hold on;
+    plot(IcArrayhistory(:, k));
+    hold off;
 
-   plot(IArrayhistory(:,k))
-   hold on
-   plot(IcArrayhistory(:,k))
-   hold off
-   title(titlestring)
-   
-   legend('I in line element','I_c of line element',Location='southwest')
-   grid on
-      ylim([-4000 8000])
-   xlim([1 length(IcArray)])
-ylabel('Current [A]')
-   xlabel('Line element number [-]')
-   set(gcf,'position',[3 4 1500 1000])
-   frame = getframe(gcf);
-   writeVideo(v,frame);
+    title(titleString);
+    legend('I in line element', 'I_c of line element', 'Location', 'southwest');
+    grid on;
+    ylim(YLIM_CURRENT_A);
+    xlim([1, length(IcArray)]);
+    ylabel('Current [A]');
+    xlabel('Line element number [-]');
 
+    frame = getframe(gcf);
+    writeVideo(v, frame);
 end
-
-close(v);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-% N = 31    ;
-% 
-% for i = 1:N
-%     figure(1)  
-%   %  imshow(processo(:,:,1,i))
-% 
-% plot(IArrayhistory(:,N))
-% 
-%       F(i) = getframe(gcf) ;
-%       drawnow
-%     end
-%   % create the video writer with 1 fps
-%   writerObj = VideoWriter('myVideo2.avi');
-%   writerObj.FrameRate = 1;
-%   % set the seconds per image
-% % open the video writer
-% open(writerObj);
-% % write the frames to the video
-% for i=1:length(F)
-%     % convert the image to a frame
-%     frame = F(i) ;    
-%     writeVideo(writerObj, frame);
-% end
-% % close the writer object
-% close(writerObj);

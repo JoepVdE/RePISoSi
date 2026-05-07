@@ -1,3 +1,13 @@
+% =========================================================================
+%  *** LEGACY / HISTORICAL VARIANT ***  --  main.m
+%
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%
+%  This file is preserved for reproducibility of older results. The
+%  canonical entry point for new work is `main_5turnMM.m`. This script is
+%  not actively maintained and may not run against the current versions of
+%  the helper functions.
+% =========================================================================
 % ***** Quench analysis of partially insulated coil *****
 % 
 %
@@ -6,7 +16,7 @@
 % *****
 
 
-clear all; close all; clc; 
+clear; close all; clc; 
 
 set(0, 'defaultTextFontName', 'times', 'defaultTextFontSize', 14);
 set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);

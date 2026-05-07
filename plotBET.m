@@ -1,101 +1,50 @@
-figure(2)
+% -------------------------------------------------------------------------
+%  plotBET.m  --  Snapshot E-field probe over the 5-turn helix at a chosen
+%                  iteration. Originally also produced a Vground.mp4 video
+%                  but the recording loop is left disabled by default.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Required workspace variables:
+%      VGroundVectorhistory, tArrayhistory.
+%
+%  Set MAKE_VIDEO = true to re-enable the per-frame video writer.
+%  TODO: parameterize the hardcoded RSol = 0.12 m used in the normalisation.
+% -------------------------------------------------------------------------
 
-    set(gcf,'Color','w')
-   s1 = 't = ';
-   s3 = ' s';
+MAKE_VIDEO = false;   % set true to write Vground5.mp4
+RSol_assumed = 0.12;  % m  -- TODO: parameterize / read from workspace
 
+figure(2);
+set(gcf, 'Color', 'w');
 
-% v = VideoWriter('Vground5.mp4','MPEG-4');
-% v.FrameRate = 1;
-% open(v);
-% 
-% for k = 1:size(VGroundVectorhistory,2)
-%     if tArrayhistory(k) > 40
-%         break
-%     end
-% 
-% 
-%    titlestring = strcat(s1,num2str(tArrayhistory(k),3),s3);
-% 
-%    plot(1e6.*(VGroundVectorhistory(:,k))./(5.*2.*pi.*0.12));
-% 
-%    title(titlestring)
-% 
-%    legend('E [\muV/m]',Location='southwest')
-%    grid on
-%    %    ylim([-4000 8000])
-%    % xlim([1 450])
-% ylabel('E [\muV/m]')
-%    xlabel('line element nr [-]')
-%    frame = getframe(gcf);
-%    writeVideo(v,frame);
-% 
-% end
-% 
-% close(v);
+if MAKE_VIDEO
+    v = VideoWriter('Vground5.mp4', 'MPEG-4');   % TODO: parameterize output path
+    v.FrameRate = 1;
+    open(v);
 
-
-
-
-index1 = round(length(VGroundVector)*1/10);
-index2 = round(length(VGroundVector)*9/10);
-
-
-for k = 1:size(VGroundVectorhistory,2)-1
-
-%Ecoil(k) = 1e6*(mean(VGroundVectorhistory(1:round(length(VGroundVector)*1/5),k)) - mean(VGroundVectorhistory(round(length(VGroundVector)*4/5):end,k)))/(2*pi*0.12);
-Ecoil(k) = 1e6*(VGroundVectorhistory(1/10*(length(VGroundVector)),k)-VGroundVectorhistory(9/10*(length(VGroundVector)),k));
+    for k = 1:size(VGroundVectorhistory, 2)
+        if tArrayhistory(k) > 40
+            break;
+        end
+        plot(1e6 .* VGroundVectorhistory(:, k) ./ (5 * 2*pi*RSol_assumed));
+        title(sprintf('t = %s s', num2str(tArrayhistory(k), 3)));
+        legend('E [\muV/m]', 'Location', 'southwest');
+        grid on;
+        ylabel('E [\muV/m]');
+        xlabel('line element nr [-]');
+        frame = getframe(gcf);
+        writeVideo(v, frame);
+    end
+    close(v);
 end
-figure(7)
-plot(tArrayhistory(1:length(Ecoil)),Ecoil)
-xlabel('time [s]')
-ylabel('E [\muV/m]')
-grid on
-xlim([1 400])
 
-figure(5)
-plot(tArrayhistory(1:length(centerBhistory)),centerBhistory)
-hold on
-plot(tArrayhistory(1:length(centerBhistory)),Pheatersave)
-xlabel('time [s]')
-ylabel('B [T]')
-grid on
-xlim([1 400])
-ylim([0 0.12]);
-figure(6)
-plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingBottomhistory)
-hold on
-plot(tArrayhistory(1:length(temperatureRingBottomhistory)),temperatureRingTophistory)
-grid on
-xlabel('time [s]')
-ylabel('T [K]')
-legend('T_{bottomlead}','T_{toplead}')
-xlim([1 400])
-
-
-
-% N = 31    ;
-% 
-% for i = 1:N
-%     figure(1)  
-%   %  imshow(processo(:,:,1,i))
-% 
-% plot(IArrayhistory(:,N))
-% 
-%       F(i) = getframe(gcf) ;
-%       drawnow
-%     end
-%   % create the video writer with 1 fps
-%   writerObj = VideoWriter('myVideo2.avi');
-%   writerObj.FrameRate = 1;
-%   % set the seconds per image
-% % open the video writer
-% open(writerObj);
-% % write the frames to the video
-% for i=1:length(F)
-%     % convert the image to a frame
-%     frame = F(i) ;    
-%     writeVideo(writerObj, frame);
-% end
-% % close the writer object
-% close(writerObj);
+% Single snapshot (last available iteration) when video is disabled.
+k = size(VGroundVectorhistory, 2);
+plot(1e6 .* VGroundVectorhistory(:, k) ./ (5 * 2*pi*RSol_assumed));
+title(sprintf('Snapshot at t = %s s', num2str(tArrayhistory(k), 3)));
+xlabel('line element nr [-]');
+ylabel('E [\muV/m]');
+grid on;

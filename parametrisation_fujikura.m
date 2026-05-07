@@ -1,8 +1,32 @@
-
+% -------------------------------------------------------------------------
+%  parametrisation_fujikura.m  --  Field/temperature/angle parametrisation
+%                                  of Jc for a Fujikura FESC ReBCO tape.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Inputs:
+%      B         : magnetic flux density magnitude (T)
+%      T         : temperature (K)
+%      theta_rad : angle between B and the tape c-axis (rad)
+%  Output:
+%      Jc        : engineering critical current density (A/mm^2)
+%
+%  The 19-parameter vector below was fitted to Fujikura FESC measurements
+%  and is held constant here. Treat it as calibration data; replacing the
+%  tape requires re-fitting.
+% -------------------------------------------------------------------------
 function Jc = parametrisation_fujikura(B, T, theta_rad)
-x = [0.0416305327396655 0.371106284489619 0.0374417653765792 0.0614639207403106 11.7637639979036 30.0684135381674 0.166640442478695 0.235340235784599 1.35754599801058 3.38655866222062 36.0368585670277 0.992352349642806 1.88578369197932 1.63330222942126 -0.00643731012226043 -0.175037084744646 8.11190080396986 1.84577462825066 0.00697856257152212];
-%valid for fujikura
-    g0 = x(1);      % (dimensionless) 
+    % 19-parameter Jc(B, T, theta) calibration vector (Fujikura FESC):
+    x = [0.0416305327396655, 0.371106284489619, 0.0374417653765792, ...
+         0.0614639207403106, 11.7637639979036,  30.0684135381674, ...
+         0.166640442478695,  0.235340235784599, 1.35754599801058, ...
+         3.38655866222062,   36.0368585670277,  0.992352349642806, ...
+         1.88578369197932,   1.63330222942126, -0.00643731012226043, ...
+        -0.175037084744646,  8.11190080396986,  1.84577462825066, ...
+         0.00697856257152212];
+    g0 = x(1);      % (dimensionless)
     g1 = x(2);      % (dimensionless) 
     g2 = x(3);      % (dimensionless) 
     g3 = x(4);      % (dimensionless) 

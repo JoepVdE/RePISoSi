@@ -1,6 +1,15 @@
-function [xPlot, yPlot, zPlot] = extend_arrays_for_plots(numPoints, ... 
-    numThermalSubdivisions, xArray, yArray, zArray, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, wCond, thCond, RSolEff) 
-
+% -------------------------------------------------------------------------
+%  extend_arrays_for_plots.m  --  Build inflated 3-D coordinate arrays for
+%                                 the conductor surface used by drawFieldMap.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+% -------------------------------------------------------------------------
+function [xPlot, yPlot, zPlot] = extend_arrays_for_plots(numPoints, ...
+    numThermalSubdivisions, xArray, yArray, zArray, ...
+    x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+    wCond, thCond, RSolEff)
     xArrayExtended = zeros((numPoints - 1)*numThermalSubdivisions + 1, 1);
     yArrayExtended = zeros((numPoints - 1)*numThermalSubdivisions + 1, 1);
     zArrayExtended = zeros((numPoints - 1)*numThermalSubdivisions + 1, 1);

@@ -1,7 +1,15 @@
+% -------------------------------------------------------------------------
+%  quiverC3D.m  --  3-D quiver with magnitude-coloured arrows.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  This is a third-party-style helper used by drawFieldMap. Original docstring
+%  preserved below for reference; behaviour is unchanged.
+% -------------------------------------------------------------------------
 function quiverC3D(x, y, z, u, v, w, varargin)
-%quiverC3D creates a 3D quiver plot and adds a color coding. The color coding is
-%given by the magnitudes of the component vectors. Large values result in colors 
-%from the upper end of the used colormap. 
+%QUIVERC3D creates a 3D quiver plot and adds a color coding.
 % 
 %   INPUT:
 %       x - array, x components of initial points

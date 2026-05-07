@@ -1,7 +1,19 @@
-function [BPoints] = calcPoints(numFieldPoints, numLines, xPointArray, yPointArray, zPointArray, ... 
-    xMidArray, yMidArray, zMidArray, xDiffArray, yDiffArray, zDiffArray, lenArray, IArray, ... 
-    mutualInductanceSpaceRatio) 
-
+% -------------------------------------------------------------------------
+%  calcPoints.m  --  Evaluate the magnetic flux density at arbitrary 3-D
+%                    field points using Biot-Savart with sub-segmenting.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Output: BPoints  - [x, y, z, Bx, By, Bz] per field point.
+%  Self-field is ignored; mutual contributions are sub-divided when the
+%  point-to-element distance is smaller than mutualInductanceSpaceRatio
+%  times the element length.
+% -------------------------------------------------------------------------
+function [BPoints] = calcPoints(numFieldPoints, numLines, xPointArray, yPointArray, zPointArray, ...
+    xMidArray, yMidArray, zMidArray, xDiffArray, yDiffArray, zDiffArray, lenArray, IArray, ...
+    mutualInductanceSpaceRatio)
     BiotSavartPointMatrix = zeros(numFieldPoints, numLines, 3);
     BPoints = zeros(numFieldPoints, 3);
     BPoints(:, 1) = xPointArray;

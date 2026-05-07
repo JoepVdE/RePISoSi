@@ -11,8 +11,19 @@ authors:
   given-names: "Matthias"
   orcid: "https://orcid.org/0000-0001-9769-0578"
 
-title: "ReBCO Partially Insulated Solenoid Simulation"
-version: 1.0
-doi: 
-date-released: 2023-10
+title: "ReBCO Partially Insulated Solenoid Simulation (RePISoSi)"
+version: 1.1.0
+doi:
+date-released: 2026-05
+license: MIT
+repository-code: "https://github.com/JoepVdE/RePISoSi"
 url: "https://github.com/JoepVdE/RePISoSi"
+keywords:
+  - superconductivity
+  - HTS
+  - ReBCO
+  - quench
+  - solenoid
+  - Biot-Savart
+  - partially-insulated
+  - MATLAB

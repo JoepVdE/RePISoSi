@@ -1,15 +1,19 @@
-% ***** Self-inductance of a straight long rectangular bar ***** 
-% 
-% Reference: 
-% [1] Piatek et al., "Self inductance of long conductor of rectangular 
-%     cross section," Electrical Review, ISSN 0033-2097, R. 88 NR 8/2012. 
-% 
-% Inputs:
-%   a = width (m) 
-%   b = height (m) 
-%   L = length (m) 
+% -------------------------------------------------------------------------
+%  calcSelfInductanceRectangularBar.m  --  Self-inductance of a straight
+%                                          long rectangular bar.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
 %
-% *****
+%  Reference:
+%      [1] Piatek et al., "Self inductance of long conductor of
+%          rectangular cross section," Electrical Review, ISSN 0033-2097,
+%          R. 88 NR 8/2012, Eq. (24).
+%
+%  Inputs : a = width (m), b = height (m), L = length (m).
+%  Output : LSelf (H).
+% -------------------------------------------------------------------------
 function [LSelf] = calcSelfInductanceRectangularBar(a, b, L)
 
     % Eq. (24) in [1]

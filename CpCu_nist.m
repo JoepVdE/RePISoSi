@@ -1,11 +1,23 @@
-function CpCu = CpCu_nist(T,m)
-%Input: T in K and mass in kg
-%Unit: JK^-1
-% Temperature range: 4-300 K
-% Source: NIST, https://trc.nist.gov/cryogenics/materials/OFHC%20Copper/OFHC_Copper_rev1.htm
-% Note: Even if the NIST fit is valida between 4-300 K, it is a better approximation 
-% to extend it to 1-400 K, and possibly even 1-1000 K.
-   density = 8960; % [kg/m^3] No value in NIST database, so most trustworthy value
+% -------------------------------------------------------------------------
+%  CpCu_nist.m  --  Heat capacity of OFHC copper (NIST cryogenic fit).
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Inputs:
+%      T : temperature (K), scalar
+%      m : mass (kg), scalar
+%  Output:
+%      CpCu : heat capacity (J/K)
+%
+%  Source: NIST cryogenic materials database, OFHC Copper:
+%  https://trc.nist.gov/cryogenics/materials/OFHC%20Copper/OFHC_Copper_rev1.htm
+%  The NIST fit is formally valid 4-300 K; extending up to ~400 K (or beyond)
+%  is a reasonable approximation in practice.
+% -------------------------------------------------------------------------
+function CpCu = CpCu_nist(T, m)
+   density = 8960;  %#ok<NASGU>  % kg/m^3, kept for reference
    if T<1
        T=1;
    end

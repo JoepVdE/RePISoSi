@@ -1,5 +1,16 @@
+% -------------------------------------------------------------------------
+%  create_MLPInv_matrix.m  --  Build and invert the (M | L | P) system
+%                              matrix that links line currents to node
+%                              voltages via Kirchhoff's laws.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  The full system has dimension (numLines + numPoints - 1). Point 1 is
+%  taken as the voltage reference (0 V) and is therefore excluded.
+% -------------------------------------------------------------------------
 function MLPInv = create_MLPInv_matrix(MArray, numLines, numPoints, pointIndex1, pointIndex2)
-    % Create matrix that keeps track of equations for lines and points
     MLP = zeros(numLines + numPoints - 1, numLines + numPoints - 1);
     MLP(1:numLines, 1:numLines) = MArray;
 

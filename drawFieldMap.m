@@ -1,7 +1,18 @@
-function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire,numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
-    temperatureArray, mutualInductanceSpaceRatio, IArray) 
-    % drawFieldMap is a script relying on the parameters specified in run
-    % script 
+% -------------------------------------------------------------------------
+%  drawFieldMap.m  --  Render the 3-D field-map figure used during the
+%                       transient simulation, and return the centre-axis B.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Toggle the local plot flags at the top of the function body to enable
+%  longitudinal/transverse line plots, on-conductor field arrows, current
+%  arrows, or the 3-D field-map quiver. The function colours the conductor
+%  surface by temperature.
+% -------------------------------------------------------------------------
+function [centerB] = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ...
+    temperatureArray, mutualInductanceSpaceRatio, IArray)
     fig = figure(1);
     clf(fig); 
     set(gcf, 'color', 'w'); 

@@ -1,16 +1,27 @@
-%% ***** Critical current vs. temperature ***** 
-% 
-% Inputs: 
-% T = temperature (K), can be a matrix 
-% Ic0 = critical current (A) near 0 K, scalar 
-% Tc = Critical temperature (K), scalar
-% 
-% Output: 
-% Ic = critical current (A) 
-% ***** 
+% -------------------------------------------------------------------------
+%  calc_HTS_critical_current_refined.m  --  *** BROKEN / DEAD CODE ***
+%
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  WARNING: This function references the symbols `meas_Jc` and `Ic0` that
+%  are not in its argument list and not defined in scope. It cannot run.
+%  It is preserved here only because the body documents the intended
+%  multi-parameter Jc(B, T, theta) parametrisation. For a working
+%  implementation use parametrisation_fujikura.m instead.
+%
+%  TODO: rewrite this function (or delete) once the refined parametrisation
+%        is properly integrated. Until then it is gated by an early error.
+% -------------------------------------------------------------------------
+function Ic = calc_HTS_critical_current_refined(T, Ic0, x, theta_deg, B)
+    error('calc_HTS_critical_current_refined:notImplemented', ...
+          ['calc_HTS_critical_current_refined is broken (references ', ...
+           'undefined symbols meas_Jc / Ic0). Use parametrisation_fujikura instead.']);
 
-function Ic = calc_HTS_critical_current_refined(T, Ic0,x,theta_deg,B)
-%x = [0.0416305327396655 0.371106284489619 0.0374417653765792 0.0614639207403106 11.7637639979036 30.0684135381674 0.166640442478695 0.235340235784599 1.35754599801058 3.38655866222062 36.0368585670277 0.992352349642806 1.88578369197932 1.63330222942126 -0.00643731012226043 -0.175037084744646 8.11190080396986 1.84577462825066 0.00697856257152212];
+    %#ok<*UNRCH>  %#ok<*INUSD>
+    % --- Original (non-functional) body retained below for reference ---
 
 
     g0 = x(1);      % (dimensionless) 

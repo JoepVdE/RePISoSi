@@ -1,17 +1,15 @@
-% ***** Ordinary Differential Equation solving V ***** 
-% 
-% Solves linearized system v = inv(A)*b   
-% 
-% Inputs: 
-% t = time (s) 
-% IArray = current (A) 
-% s = struct with multiple fields 
-% 
-% Output: 
-% V = voltage at each element (V) 
-% 
-% ***** 
-function VGroundVector = myODEVoltages(t, IArray, s)
+% -------------------------------------------------------------------------
+%  myODEVoltages.m  --  Recover the per-node voltages from the same
+%                        linearised system as myODE, after the ODE step.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Inputs : t (s), IArray (A), s (struct, see myODE.m).
+%  Output : VGroundVector (V) - voltage at each non-reference node.
+% -------------------------------------------------------------------------
+function VGroundVector = myODEVoltages(t, IArray, s)   %#ok<INUSL>
     s.signArray = sign(IArray(1:s.numLinesAlongWire));                                          % Direction of the current 
 	%s.INormalArray = abs(IArray(1:s.numLinesAlongWire))*ones(1,s.numThermalSubdivisions) - s.ISCArray;  
     s.INormalArray = abs(IArray(1:s.numLinesAlongWire))*ones(1, s.numThermalSubdivisions) - s.IcArray; %Critical state model

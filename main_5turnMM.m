@@ -1,709 +1,645 @@
-% ***** Quench analysis of partially insulated coil *****
-% 
+% =========================================================================
+%  main_5turnMM.m  --  RePISoSi: Quench analysis of a partially-insulated
+%                                 ReBCO solenoid (canonical entry point).
 %
-% Program written by M. Mentink, A. Vaskuri and J.L. Van den Eijnden (Oct., 2023). 
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri  (Oct. 2023).
+%  License: MIT (see LICENSE in the repository root)
 %
-% *****
+%  Purpose
+%  -------
+%  Couples a 3-D Biot-Savart self/mutual-inductance network model of an
+%  HTS solenoid with a finite-volume thermal solver and a stiff ODE for
+%  the line-element currents (ode15s). Models partially-insulated turn-to-
+%  turn shorts, helium gas convection, and copper current leads.
+%
+%  Outputs (toggled via writedata / writevideo at the top of the
+%  CONFIGURATION section):
+%    * Live 3-D field-map figure
+%    * <Description>.mp4 video
+%    * <Description><timestamp>.txt   per-iteration log
+%    * <Description><timestamp>.mat   final workspace dump
+%
+%  Usage
+%  -----
+%      addpath(genpath(pwd));   % once per MATLAB session
+%      run('main_5turnMM.m');
+%
+%  Edit the CONFIGURATION block below to change the run.
+% =========================================================================
 
-
-clear all; close all; clc; 
+clear; close all; clc;
 
 set(0, 'defaultTextFontName', 'times', 'defaultTextFontSize', 14);
 set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);
+format long;
 
-format long
-HTStapeName = 'Fujikura FESC-04 4 mm wide'; %name of tape used
-I0 = 4431;                    % Driving current (A)  test2AnnaJoep
-writedata = 1; %write output file 1 = yes 0 = no
-writevideo = 0;
+tic;
 
-Description = '15turn4431A_80VHeater_allon';
-FileName = append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.txt');  % 
+%% ===================== CONFIGURATION =====================================
+% ---- Run identification & I/O toggles -----------------------------------
+HTStapeName = 'Fujikura FESC-04 4 mm wide';   % Tape used (informational)
+Description = '15turn4431A_80VHeater_allon';  % TODO: parameterize per run
+writedata   = 1;                              % 1 = write CSV-style log file
+writevideo  = 0;                              % 1 = write MP4 of field map
 
-if writedata ==1
-fileID = fopen(FileName,'w');
-end
+% ---- Physics flags ------------------------------------------------------
+Helium_cooling     = 1;   % 1 = on, 0 = off
+copper_heat        = 1;   % copper-lead heat conduction (1=on, 0=off)
+copper_conduction  = 1;   % copper-lead electrical conduction (1=on, 0=off)
 
-if writevideo ==1 
-v = VideoWriter(append(Description,'.mp4'),'MPEG-4');
-v.FrameRate = 5;
-open(v);
-end
+% ---- Driving current ----------------------------------------------------
+I0 = 4431;        % Driving current (A)
 
+% ---- Heater pulse profile (5 pulses) -----------------------------------
+% toffset(k) = wait time before pulse k (s); theater(k) = duration of pulse k (s)
+toffset = [8.071, 48.795, 70.456, 84.040, 69.285, 100];   % s
+theater = [1.633,  5.478, 10.304, 15.420, 19.826];        % s
+RHeater = 350;        % heater resistance (ohm)
+VHeater = 80;         % heater voltage (V)
+PHeater = VHeater.^2 / RHeater;   % heater power (W)
 
-Helium_cooling = 1; %1 is on, 0 is off.
-copper_heat = 1; %1 is on, 0 is off.
-copper_conduction = 1;%1 is on, 0 is off.
+% ---- Time-stepping control ----------------------------------------------
+dTMax               = 1;     % Max temperature change per substep (K)
+temperatureSubSteps = 200;   % Number of thermal substeps per magnetic step
+maxIteration        = 50000; % Number of magnetic-network iterations
+drawFigureAtIteration = 20;  % Plot field map every N iterations
+simulation_time_limit = 600; % Hard stop at this simulated time (s)
 
+% ---- Initial temperatures ----------------------------------------------
+initial_temperature = 20;                       % Coil initial temperature (K)
+temperature_helium  = initial_temperature;      % He bath temperature (K)
+k_helium            = conductivity_helium(temperature_helium);
 
-toffset = [8.071,48.795,70.456,84.040,69.285,100]; % [s] time heater is on
-theater = [1.633,5.478,10.304,15.42,19.826]; %[s]   time in between heating pulses
-RHeater = 350; % resistance of heater [Ohm]
-VHeater = 80; % voltage over heater V
+% ---- Solenoid geometry --------------------------------------------------
+RSol         = 0.12;       % Solenoid radius (m)
+N_shorts     = 19;         % Number of axial shorts per turn
+arclengthSlot = 4e-2;      % Arclength of slot (m, informational)
+thSlot        = 3.7e-3;    % Arclength of short (m)
 
-PHeater = VHeater.^2/RHeater;
+% Number of line elements between two axial shorts (must be even).
+resolution = 4;
+resolution = round(resolution/2) * 2;
 
-dTMax = 1;                   % Maximum temperature difference (K) if too large (at 10 K), temperature becomes unaccurate
+% Off-by-one-turn axial-short placement maximises the axial resistance.
+numPointsPerTurn = N_shorts*resolution - resolution/2;
 
+wCond        = 0.0085;     % Conductor width (m)
+thReBCO      = 2.2e-6;     % ReBCO layer thickness (m)
+% Effective Al-stabiliser thickness (incl. gap):
+%   3.8 mm = (1.5*5 + 4.5*3 + 1.5*5) / (1.5 + 4.5 + 1.5)
+thCond       = 0.0038;     % Effective conductor thickness (m)
+thWallatShort = 5e-3;      % Wall thickness between slots (m)
+heightSlot   = 1e-3;       % Slot height (m)
+ACond        = wCond .* thCond;        % Conductor cross-sectional area (m^2)
 
-initial_temperature = 20; % Initial temperature of 10 K
-temperature_helium = initial_temperature; %[K]
-k_helium = conductivity_helium(temperature_helium);
+numWindings  = 5;                      % Number of turns
+len          = numWindings * (wCond + thSlot);   % Solenoid axial length (m)
 
-% ***** Solenoid properties ***** 
-RSol = 0.12;                 % Solenoid radius (m)
-N_shorts = 19;               % Number of shorts per turn
+ignoreMutualInductancesTransverseElements = 0;
+numThermalSubdivisions = 3;            % Subdivisions per element (thermal)
 
-arclengthSlot = 4*10^(-2);      % arclength of slot (m)
-thSlot = 3.7*10^(-3);     %arclength of short (m)
+% ---- Current-lead (copper ring) properties ------------------------------
+NRings      = 2;
+DouterLead  = 0.307;        % Outer diameter (m)
+DinnerLead  = 0.208;        % Inner diameter (m)
+ARing       = pi*(DouterLead^2 - DinnerLead^2)/4;     % Annular area (m^2)
+thRing      = 0.01;                                    % Ring thickness (m)
+crossSectionRing = thRing*(DouterLead - DinnerLead);   % Radial cross-section (m^2)
+rhoCopper   = 8960;                                    % Copper density (kg/m^3)
+massRing    = ARing * thRing * rhoCopper;              % Ring mass (kg)
+temperatureRing = initial_temperature;                 % Initial ring T (K)
+% RRR ~110 (normal Cu), ~45 (non-annealed OFE), 160 used here for annealed OFE.
+RingRRR     = 160;
 
-resolution = 4; % number of lines between axial shorts, must be even
-resolution = round(resolution/2)*2; %force to be even
+% ---- Superconducting tape parameters ------------------------------------
+N_tapes     = 4;
+tapewidth   = 4e-3;     % m
+SCthickness = 2.2e-6;   % m
 
-numPointsPerTurn = N_shorts*resolution-resolution/2; %make resolution such that shorts are such that they maximalise the axial resistance (off by one turn)
-
-wCond = 0.0085;              % Conductor width (m) 
-thReBCO = 2.2E-6;            %thickness ReBCO layer (m)
-thCond = 0.0038;             % Effective conductor thickness (including Al stabiliser) (m), 
-                             % 3.8 mm = 1.5 mm * 5 mm + 4.5 mm * 3 mm + 1.5 mm * 5 mm)/(1.5 mm + 4.5 mm + 1.5 mm)   
-
-thWallatShort = 5e-3; %[m] thickness of the short wall in between slots. 
-heightSlot = 1e-3; %[m] 
-ACond = wCond.*thCond;       % Cross-sectional area of the conductor (m)        is actually 7.5 mm but needs to be 8.5 here to include the 1 mm gap
-
-numWindings = 5;            % Number of turn forming a solenoid (dimensionless)
-len = numWindings*(wCond + thSlot);     % Length of a solenoid (m)
-
-ignoreMutualInductancesTransverseElements = 0; % (yes = 1, no = 0)
-numThermalSubdivisions = 3;  % Number of subdivisions
-temperatureSubSteps = 200;   % Number of temperature timesteps per magnetic timestep 
-
-
-
-
-% ***** Current lead properties ******
-NRings = 2;
-DouterLead = 0.307; %diameter in meter
-DinnerLead = 0.208;
-
-
-ARing = pi*(DouterLead^2-DinnerLead^2)/4; %[m^2]
-
-thRing = 0.01; %[m] thickness copper current lead
-
-crossSectionRing = thRing*(DouterLead-DinnerLead); %[m^2]
-rhoCopper = 8960;  %[kg/m^3]
-
-massRing = ARing*thRing*rhoCopper; %[kg]
-temperatureRing = initial_temperature; %[K]
-
-RingRRR = 160; %[-] Ekin for annealed OFE copper. Normal copper RRR~110, not ennealed OFE RRR~45
-
-
-% ***** Superconducting cable properties ***** 
-N_tapes = 4;
-tapewidth = 4E-3; %[m]
-SCthickness = 2.2E-6; %[m]
-
-
-
-% ***** Look up tables ***** 
-Tinitialise = 0.1:0.1:400;
-L = 2.44E-8; %[V^2K^-2]
-
-ktable = 1E6.*Tinitialise.*L./BlochGrun(Tinitialise,0.24233,432.43,0.0247015,5);
-rhotable = BlochGrun(Tinitialise,0.24233,432.43717,0.0247015,5)/1E6;
-% ***** 
-%
-
-% ***** Initialize mesh for FEM ***** 
-
-pointAngle = 2*pi/numPointsPerTurn;  % Angle between the points (rad)
-
-RSolMin = RSol*cos(pointAngle); % Minimum distance from the center due to finite number of points (m)
-RSolAvg = 0.5*(RSolMin + RSol); % Average distance (m)
-
-
-
-RSolEff = RSol^2/RSolAvg;       % Effective distance (m)
-
-
-mutualInductanceSpaceRatio = 10; 
+% ---- Mutual-inductance numerical parameters -----------------------------
+mutualInductanceSpaceRatio      = 10;
 mutualInductanceSpaceRatioLimit = 1000;
 
-numPoints = floor(numPointsPerTurn*numWindings + 1);            % Total number of 3D points
-numThermalElements = (numPoints - 1)*numThermalSubdivisions;    % Total number of thermal elements
+%% ===================== MATERIAL LOOKUP TABLES ============================
+% Lookup tables are indexed by round(10*T), so T resolution is 0.1 K.
+Tinitialise = 0.1:0.1:400;
+L_lorenz    = 2.44e-8;     % Lorenz number (V^2 K^-2)
+% Bloch-Grueneisen fit parameters for Al-10SiMg taken from prior calibration.
+ktable   = 1e6 .* Tinitialise .* L_lorenz ./ ...
+           BlochGrun(Tinitialise, 0.24233, 432.43,    0.0247015, 5);
+rhotable = BlochGrun(Tinitialise, 0.24233, 432.43717, 0.0247015, 5) / 1e6;
 
-numLinesAlongWire = numPoints - 1; 
+%% ===================== MESH GENERATION ===================================
+% Effective radius accounts for finite point count (chord vs. arc).
+pointAngle = 2*pi/numPointsPerTurn;
+RSolMin    = RSol * cos(pointAngle);
+RSolAvg    = 0.5 * (RSolMin + RSol);
+RSolEff    = RSol^2 / RSolAvg;
 
-dIdt = zeros(numLinesAlongWire,1); %initial dIdt
-%numTransverse = floor((numWindings - 1)*numPointsPerTurn + 1); 
-numTransverse = floor((numWindings - 1)*N_shorts + 1)-round((numWindings/2)); %It has 0.5 turn leftover each round because shorts spacing is off by one turn. That's why
-numTransverse = max(numTransverse, 0); 
-numLines = numLinesAlongWire + numTransverse; 
+numPoints           = floor(numPointsPerTurn*numWindings + 1);
+numThermalElements  = (numPoints - 1) * numThermalSubdivisions;
+numLinesAlongWire   = numPoints - 1;
 
-IArrayTrans = zeros(numTransverse-1,1);
+% Number of axial shorts. The "-round(numWindings/2)" term accounts for the
+% deliberate off-by-one-turn pattern: each round leaves ~0.5 turn unconnected.
+numTransverse = floor((numWindings - 1)*N_shorts + 1) - round(numWindings/2);
+numTransverse = max(numTransverse, 0);
+numLines      = numLinesAlongWire + numTransverse;
 
-% Generate line elements in helix form
-[xArray, yArray, zArray] = ... 
-    generate_line_elements(numPoints, numPointsPerTurn, RSolEff, numWindings, wCond); 
+dIdt        = zeros(numLinesAlongWire, 1);
+IArrayTrans = zeros(numTransverse - 1, 1);
 
+% --- Helix line elements --------------------------------------------------
+[xArray, yArray, zArray] = generate_line_elements( ...
+    numPoints, numPointsPerTurn, RSolEff, numWindings, wCond);
 
+[x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+ pointIndex1, pointIndex2] = gather_space_for_lines( ...
+    numLinesAlongWire, numTransverse, numLines, numPointsPerTurn, ...
+    xArray, yArray, zArray, resolution);
 
-% Gather space for lines
-[x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, pointIndex1, pointIndex2] = ... 
-    gather_space_for_lines(numLinesAlongWire, numTransverse, numLines, numPointsPerTurn, xArray, yArray, zArray, resolution); 
+% --- Plotting coordinates -------------------------------------------------
+[xPlot, yPlot, zPlot] = extend_arrays_for_plots(numPoints, ...
+    numThermalSubdivisions, xArray, yArray, zArray, ...
+    x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+    wCond, thCond, RSolEff);
 
-
-
-% Coordinates for plotting 
-[xPlot, yPlot, zPlot] = extend_arrays_for_plots(numPoints, numThermalSubdivisions, ... 
-    xArray, yArray, zArray, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, wCond, thCond, RSolEff); 
-
-% Distance between the turns
+% --- Element lengths ------------------------------------------------------
 xDiffArray = x2Array - x1Array;
 yDiffArray = y2Array - y1Array;
-zDiffArray = z2Array - z1Array; 
+zDiffArray = z2Array - z1Array;
+lenArray   = sqrt(xDiffArray.^2 + yDiffArray.^2 + zDiffArray.^2);
+lenArrayAlongWire         = lenArray(1:numLinesAlongWire);
+lenArrayAlongWireElements = lenArrayAlongWire * ones(1, numThermalSubdivisions) ...
+                            ./ numThermalSubdivisions;
 
-lenArray = sqrt(xDiffArray.^2 + yDiffArray.^2 + zDiffArray.^2); 
-lenArrayAlongWire = lenArray(1:numLinesAlongWire); % Length of the conductor along turns, excluding transverse elements 
-lenArrayAlongWireElements = lenArrayAlongWire*ones(1, numThermalSubdivisions)./numThermalSubdivisions; 
+%% ===================== INDUCTANCE + BIOT-SAVART (pre-loop) ===============
+[MArray, LTotal] = generate_inductance_matrix(numLines, numLinesAlongWire, ...
+    wCond, thCond, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+    mutualInductanceSpaceRatio, mutualInductanceSpaceRatioLimit, ...
+    ignoreMutualInductancesTransverseElements);
 
-[MArray, LTotal] = generate_inductance_matrix(numLines, numLinesAlongWire, wCond, thCond, x1Array, x2Array, ... 
-    y1Array, y2Array, z1Array, z2Array, mutualInductanceSpaceRatio, mutualInductanceSpaceRatioLimit, ignoreMutualInductancesTransverseElements);  
-
-% Create matrix that keeps track of equations for lines and points
 MLPInv = create_MLPInv_matrix(MArray, numLines, numPoints, pointIndex1, pointIndex2);
 
-% ***** Biot-Savart calculations ***** 
-% The special case of a uniform constant current I (current is out from the integral)
+% Initial current distribution: uniform along the wire, zero in shorts.
+IArray = zeros(numLines, 1);
+IArray(1:numLinesAlongWire) = I0;
 
-IArray = zeros(numLines, 1); % All lines (including transverse lines) can carry current
-IArray(1:numLinesAlongWire) = I0; % Current is only induced along the line 
-% IArray(1:3) = I0;
-% IArray(end) = I0;
+[BiotSavartMatrixX, BiotSavartMatrixY, BiotSavartMatrixZ, ...
+ BLocalXArray, BLocalYArray, BLocalZArray] = calc_biot_savart( ...
+    numLines, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+    IArray, mutualInductanceSpaceRatio);
 
-[BiotSavartMatrixX, BiotSavartMatrixY, BiotSavartMatrixZ, BLocalXArray, BLocalYArray, BLocalZArray] ... 
-    = calc_biot_savart(numLines, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ... 
-    IArray, mutualInductanceSpaceRatio); 
+%% ===================== INITIAL CONDITIONS ================================
+temperatureArray = ones(numPoints - 1, numThermalSubdivisions) * initial_temperature;
+% Initial hotspot, used to seed the quench:
+temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 22;
 
+V_local_element = zeros(numLinesAlongWire, 1);
+VGroundVector   = zeros(numLinesAlongWire, 1);
 
-% ***** Initial conditions of the magnet ***** 
-temperatureArray = ones(numPoints - 1, numThermalSubdivisions)*initial_temperature;  
-temperatureArray(floor(numPoints/2 + 0.5), floor(numThermalSubdivisions/2 + 1.5)) = 22; % Hotspot 22 K
+% Geometry-derived constants used in the heat-balance loop
+arclengthCylinder  = 2*pi*RSol;
+widthWall          = 0.005;     % m
 
+A_helium  = (wCond - heightSlot) .* lenArrayAlongWireElements;
+L_helium  = 0.5 .* ((wCond - heightSlot) + lenArrayAlongWireElements);
+Nu        = 4.36;   % Nusselt number, steady laminar pipe flow
 
-% ***** Turn-to-turn resistance ***** 
+volumeArray = (lenArray(1:numLinesAlongWire) ./ numThermalSubdivisions ...
+               .* thCond * wCond) * ones(1, numThermalSubdivisions);
+Acylinder = 2 * 2*pi*RSol * (wCond - heightSlot) * numWindings;
+Aslots    = 2 * numTransverse * thSlot * thWallatShort;
+Atotal    = Acylinder + Aslots;
+cooling_area_correction_factor = Atotal / Acylinder;
 
+IExt = I0;   % External current (held constant in this run)
 
-arclengthCylinder = 2*pi*RSol;
-widthWall = 0.005;          %m        
+%% ===================== OUTPUT FILES (logfile + video) ====================
+FileName = append(Description, ...
+    string(datetime('now', 'TimeZone', 'local', 'Format', 'd-MMM-y')), '_', ...
+    string(datetime('now', 'TimeZone', 'local', 'Format', 'HH.mm.ss')), '.txt');
 
-
-% ***** Helium gas cooling characteristics ***** 
-
-A_helium = (wCond-heightSlot).*lenArrayAlongWireElements; %characteristic length for natural convection
-L_helium = 0.5.*((wCond-heightSlot)+lenArrayAlongWireElements);
-Nu = 4.36; %Nusselt number for steady laminar pipe flow
-
-
-volumeArray = (lenArray(1:numLinesAlongWire)./numThermalSubdivisions ... 
-    .*thCond*wCond)*ones(1, numThermalSubdivisions);
-Acylinder = 2*2*pi*RSol*(wCond-heightSlot)*numWindings;
-Aslots = 2*numTransverse*thSlot*thWallatShort;
-
-Atotal = Acylinder+Aslots;
-cooling_area_correction_factor = Atotal/Acylinder;
-
-
-
-% The vector comprises all dI/dt followed by all voltage points, excluding
-% point 1, which is per definition always at 0 V
-V_local_element = zeros(numLinesAlongWire,1);
-VGroundVector = zeros(numLinesAlongWire,1);
-
-% ***** 
-
-IExt = I0; % External current 
-
-if writedata ==1
-fprintf(fileID,'Input Parameters RePISoSi code: \n \n');
-fprintf(fileID,'Initial Current: %.0f [A]\n', I0);
-fprintf(fileID,'Radius solenoid: %.3f [m]\n', RSol);
-fprintf(fileID,'Number of turns: %.1g [-]\n', numWindings);
-fprintf(fileID,'Number of shorts per turn: %.2g [-]\n', N_shorts);
-fprintf(fileID,'Number of line-elements between axial shorts: %.1g [-]\n', resolution);
-fprintf(fileID,'Thickness of stabiliser wall: %.2g [mm]\n', 1e3*thCond);
-fprintf(fileID,append('Tape type:',HTStapeName,'\n'));
-fprintf(fileID,'Number of tapes [-]: %.1g\n', N_tapes);
-fprintf(fileID,'Initial temperature [K]: %.1f\n', initial_temperature);
-fprintf(fileID,'Power of Heater [W]: %.1f\n', PHeater);
-fprintf(fileID,'Heating time [s]: %.1f\n', theater);
-fprintf(fileID,'deltaTmax (used for determination time step) [K]: %.1f\n', dTMax);
-fprintf(fileID,'temperatureSubSteps [-]: %.1f\n', temperatureSubSteps);
-fprintf(fileID,'Status Helium convection cooling (1 = on, 0 = off): %.1g\n', Helium_cooling);
-fprintf(fileID,'Status Copper heat conduction cooling (1 = on, 0 = off): %.1g\n', copper_heat);
-fprintf(fileID,'Status Copper conductivitiy (1 = on, 0 = off): %.1g\n \n \n', copper_conduction);
-
-fprintf(fileID,'time [s], centerB [T], Pheater [W], TringTop [K], TringBottom [K], Efield [uV/m], Tmax [K] \n');
-
+fileID = -1;
+if writedata == 1
+    fileID = fopen(FileName, 'w');   % TODO: parameterize output directory
+    write_log_header(fileID, I0, RSol, numWindings, N_shorts, resolution, ...
+        thCond, HTStapeName, N_tapes, initial_temperature, PHeater, theater, ...
+        dTMax, temperatureSubSteps, Helium_cooling, copper_heat, copper_conduction);
 end
-disp('Transient calculation'); 
 
-maxIteration = 50000; % Number of iterations 
-updateCounter = floor(maxIteration/100);
+v = [];
+if writevideo == 1
+    v = VideoWriter(append(Description, '.mp4'), 'MPEG-4');
+    v.FrameRate = 5;
+    open(v);
+end
 
-drawFigureAtIteration = 20; % How many iterations go by before a plot is made.
+%% ===================== TRANSIENT MAIN LOOP ===============================
+disp('Transient calculation');
 
-s.MLPInv = MLPInv;     
+% Per-run pre-allocations.
+% NOTE: many of these grow with iterationIndex; we pre-allocate to the cap
+% (maxIteration) and the simulation may exit early via the time-limit break.
+tArrayhistory                = zeros(1, maxIteration);
+IArrayhistory                = zeros(numLines, maxIteration);
+IcArrayhistory               = zeros(numPoints - 1, maxIteration);
+VGroundVectorhistory         = zeros(numPoints - 1, maxIteration);
+Qheliumcoolingarrayhistory   = zeros(numPoints - 1, numThermalSubdivisions, maxIteration);
+temperatureArraystored       = zeros(numPoints - 1, numThermalSubdivisions, maxIteration);
+temperatureRingTophistory    = zeros(1, maxIteration);
+temperatureRingBottomhistory = zeros(1, maxIteration);
+temperaturemax               = zeros(1, maxIteration);
+centerBhistory               = zeros(1, maxIteration);
+Efield                       = zeros(1, maxIteration);
 
-temperatureCalculationStartTime = now*24*3600;
-temperatureCalculationFinishTime = now*24*3600;
-materialsPropsCalculationStartTime = now*24*3600;
-materialsPropsCalculationFinishTime = now*24*3600;
-ODECalculationStartTime = now*24*3600;
-ODECalculationFinishTime = now*24*3600;
+s.MLPInv = MLPInv;
 
-plottingStartTime = now*24*3600;
-plottingFinishTime = now*24*3600;
+% Timing accumulators (use posixtime-equivalent: now*86400 in seconds)
+overallFirstStartTime = now * 86400;
 
+centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, ...
+    numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, ...
+    x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+    BLocalXArray, BLocalYArray, BLocalZArray, ...
+    temperatureArray, mutualInductanceSpaceRatio, IArray);
 
-overallFinishTime = now*24*3600;
-overallStartTime = now*24*3600;
-overallFirstStartTime = now*24*3600;
+t                     = 0;                  % Initial simulated time (s)
+temperatureRingTop    = temperatureRing;
+temperatureRingBottom = temperatureRing;
 
+% E-field probe arc length: distance between voltage taps at 1/10 and 9/10
+% of the wire, projected onto the solenoid circumference.
+EfieldArcLength = numWindings * arclengthCylinder * 0.8;
+% NOTE: original hardcoded 4*2*pi*0.12 (= 4 turns * circumference at R=0.12).
+% Replaced with EfieldArcLength = 0.8 * numWindings * 2*pi*RSol so the metric
+% scales with the geometry; for the published 5-turn 0.12 m run this equals
+% 4 * 2*pi*0.12 to within rounding.
 
+for iterationIndex = 1:maxIteration
+    overallStartTime              = now * 86400;
+    materialsPropsCalculationStartTime = overallStartTime;
 
+    externaldIdtVector             = zeros(numPoints - 1, 1);
+    s.externalVoltagedIdtVector    = zeros(numPoints - 1, 1);
 
-centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire,numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
-    x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
-    temperatureArray, mutualInductanceSpaceRatio, IArray); 
+    %% --- Material property lookup ---------------------------------------
+    % Index into the 0.1-K-spaced lookup tables.
+    temperatureIndices         = round(10 * temperatureArray);
+    thermalConductivityArray   = ktable(temperatureIndices);
+    resistivityNormalArray     = rhotable(temperatureIndices);
+    heatCapacityArray          = heat_capacity_al_alloy_5083(temperatureArray, volumeArray);
 
+    BXYZarray   = [BLocalXArray, BLocalYArray, BLocalZArray];
+    XYZarray    = [xArray, yArray, zArray];   %#ok<NASGU> kept for debugger
+    BArray      = vecnorm(BXYZarray, 2, 2);
 
-t = 0; % Initial time (s) 
-        temperatureRingTop = temperatureRing;
-        temperatureRingBottom = temperatureRing;
-% Linearized model to calculate quench propagation 
-for iterationIndex = 1:maxIteration       
+    % Tape c-axis is normal to the solenoid surface (z-component zeroed).
+    CaxistapeArray   = [xArray, yArray, zeros(length(xArray), 1)];
+    nC               = length(CaxistapeArray);
+    theta_angleArray = acos(dot(BXYZarray(1:nC, :), CaxistapeArray, 2) ./ ...
+                            (BArray(1:nC) .* vecnorm(CaxistapeArray, 2, 2)));
 
-    overallStartTime = now*24*3600;
-	materialsPropsCalculationStartTime = now*24*3600;
-    
+    % Worst-case (hottest) temperature in each line element drives Ic.
+    maxTemparray = max(temperatureArray, [], 2);
+    nT = length(temperatureArray);
+    IcArray = N_tapes * tapewidth*1e3 * SCthickness*1e3 * ...
+              parametrisation_fujikura(BArray(1:nT), maxTemparray, theta_angleArray(1:nT));
+    IcArrayhistory(:, iterationIndex) = IcArray;
 
-        
-    externaldIdtVector = zeros(numPoints - 1, 1);
-    
-    % Current flows out of the last point
-    s.externalVoltagedIdtVector = zeros(numPoints - 1, 1);
+    materialsPropsCalculationFinishTime = now * 86400;
 
-    % Material property calculation		    
-    
-    %thermalConductivityArray = thermal_conductivity_Al10SiMg(temperatureArray); % (W/(m*K)) 
-    %thermalConductivityArray = thermal_conductivity_al_alloy_5083(temperatureArray); % (W/(m*K)) 
-  
-    %resistivityNormalArray = calc_normal_Al10SiMg_resistivity(temperatureArray); % (ohm*m)
-    %resistivityNormalArray = calc_normal_Al_alloy_resistivity(temperatureArray); % (ohm*m)
+    %% --- Resistance of axial shorts (turn-to-turn) ----------------------
+    temperatureBottomArray = temperatureArray(1:resolution:(numTransverse-1)*resolution, 1);
+    temperatureTopArray    = temperatureArray( ...
+        numPointsPerTurn+1 : resolution : (numTransverse-1)*resolution + numPointsPerTurn, 1);
+    temperatureshort       = (temperatureBottomArray + temperatureTopArray) / 2;
+    axialshortResistance   = heightSlot * rhotable(round(temperatureshort*10)) ...
+                             / (thSlot * widthWall);
+    axialshortResistance   = transpose(axialshortResistance);
 
-    rounded(:,:) = round(10*temperatureArray(:,:));
-    kmatrix = zeros(size(temperatureArray));
-    kmatrix = ktable(rounded(:,:));
-    thermalConductivityArray = kmatrix;
-    rhomatrix = zeros(size(temperatureArray));
-    rhomatrix = rhotable(rounded(:,:));
-    resistivityNormalArray = rhomatrix;
+    RArrayTrans          = axialshortResistance;
+    RArrayTrans(end + 1) = RArrayTrans(end);   % padding to match numTransverse
 
+    %% --- Longitudinal stabiliser resistance -----------------------------
+    RNormalArray = resistivityNormalArray .* lenArrayAlongWire(1:numLinesAlongWire) ...
+                   ./ (ACond .* numThermalSubdivisions);
 
-    % Materials calculation starts here
-	
-	
-
-    heatCapacityArray= heat_capacity_al_alloy_5083(temperatureArray, volumeArray);
-
-
-
-
-    BXYZarray = [BLocalXArray BLocalYArray BLocalZArray]; %matrix of magnetic field direction at each point every row with columns 1,2,3 describing x,y,z coordinates respectively
-    XYZarray =  [xArray yArray zArray];                   %matrix of cartesian coordinates of each point in every row with column  1,2,3 describing x,y,z coordinates respectively
-    %BArray = sqrt(BLocalXArray.^2+BLocalYArray.^2+BLocalZArray.^2);
-    BArray = vecnorm(BXYZarray,2,2); %length of vector corresponding to magnitude B-field, same as above
-
-    
-    CaxistapeArray = [xArray yArray zeros(length(xArray),1)];
-
-    theta_angleArray = acos(dot(BXYZarray(1:length(CaxistapeArray),:),CaxistapeArray,2)./(BArray(1:length(CaxistapeArray)).*vecnorm(CaxistapeArray,2,2))); %angle in rad between coordinate vector at each point on cylinder, but with z=0, so parallel to the c-axis of the rebco tape and the magnetic field 
-
-    maxTemparray = max(temperatureArray,[],2); %always get the highest temperature in the finer temperature scale
-    IcArray = N_tapes*tapewidth*1e3*SCthickness*1e3*parametrisation_fujikura(BArray(1:length(temperatureArray)),maxTemparray,theta_angleArray(1:length(temperatureArray)));
- %   IcArray(1:round(length(IcArray)/5)) = 15000; 
-  %  IcArray(round(4*length(IcArray)/5):end) = 15000;
-    IcArrayhistory(:,iterationIndex) = IcArray;
-	
-	% Materials props calculation stops here and temperature part starts
-	materialsPropsCalculationFinishTime = now*24*3600;
-	
-	
-	%disp(sprintf("Materials calculation time: %0.3f s", materialsPropsCalculationFinishTime-materialsPropsCalculationStartTime));   
-	
-	temperatureCalculationStartTime = now*24*3600;
-
-
-
-
-    temperatureBottomArray =  temperatureArray(1:resolution:(numTransverse-1)*resolution,1); %temperature at bottom element of axial short
-    temperatureTopArray = temperatureArray(numPointsPerTurn+1:resolution:(numTransverse-1)*resolution+numPointsPerTurn,1);
-    temperatureshort = (temperatureBottomArray+temperatureTopArray)/2;
-    axialshortResistance = heightSlot*rhotable(round(temperatureshort*10))/(thSlot*widthWall); % Turn-to-turn resistance (ohm)|8.267091125040324e-08 : used to be 1e-6
-    axialshortResistance = transpose(axialshortResistance);
-
-    RArrayTrans = axialshortResistance;
-    RArrayTrans(end+1) = RArrayTrans(end);
-
-    RNormalArray = resistivityNormalArray.*lenArrayAlongWire(1:numLinesAlongWire)./(ACond.*numThermalSubdivisions);			
     if copper_conduction == 1
-        RNormalArray(1:round(length(RNormalArray)/5),:) =         ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1),BArray(1:round(length(RNormalArray)/5)),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
-        RNormalArray(round(1+4*length(RNormalArray)/5):end,:) =     ones(round(length(RNormalArray)/5),3).*rhoCu_nist(temperatureRingBottom.*ones(round(length(RNormalArray)/5),1), ...
-        BArray(round(1+4*length(RNormalArray)/5):round(length(RNormalArray))),RingRRR,1).*lenArrayAlongWire(1:numLinesAlongWire/5)./(crossSectionRing.*numThermalSubdivisions); %consider copper for stabilisation of first turn
+        % First and last 1/5 of the conductor length are stabilised by the
+        % copper rings (current leads). Override the local resistance.
+        nFifth = round(length(RNormalArray) / 5);
+        rhoCu_top    = rhoCu_nist(temperatureRingBottom*ones(nFifth, 1), ...
+                                  BArray(1:nFifth), RingRRR, 1);
+        rhoCu_bottom = rhoCu_nist(temperatureRingBottom*ones(nFifth, 1), ...
+                                  BArray(1+4*nFifth:5*nFifth), RingRRR, 1);
+
+        RNormalArray(1:nFifth, :) = ones(nFifth, 3) .* rhoCu_top ...
+            .* lenArrayAlongWire(1:numLinesAlongWire/5) ...
+            ./ (crossSectionRing .* numThermalSubdivisions);
+        RNormalArray(1 + 4*nFifth : end, :) = ones(nFifth, 3) .* rhoCu_bottom ...
+            .* lenArrayAlongWire(1:numLinesAlongWire/5) ...
+            ./ (crossSectionRing .* numThermalSubdivisions);
     end
 
-    IAbsArray = abs(IArray(1:numLinesAlongWire))*ones(1, numThermalSubdivisions); % Total current (A)
-    %E0 = 100*1E-6; %[V/m] critical E-field convention
-    %u0_array = E0.*lenArrayAlongWire(1:numLinesAlongWire); %[V] critical voltage over element following from Efield convention
-    %n_value_array = n_value(maxTemparray,HTStapeName);
+    %% --- Power dissipation per element (critical-state model) -----------
+    IAbsArray    = abs(IArray(1:numLinesAlongWire)) * ones(1, numThermalSubdivisions);
+    INormalArray = IAbsArray - IcArray;
+    INormalArray = INormalArray .* (INormalArray > 0);
+    VElementArray = INormalArray .* RNormalArray;
+    PElementArray = VElementArray .* IAbsArray;
 
-    
-  
-% 
+    % Joule heating in axial shorts split 50/50 between top and bottom turn.
+    IArrayTrans              = IArray(numLinesAlongWire+1:end-1);
+    PElementArrayTransverse  = IArrayTrans.^2 .* axialshortResistance;
+    bottomIdx = 1 : resolution : (numTransverse-1)*resolution;
+    topIdx    = numPointsPerTurn+1 : resolution : (numTransverse-1)*resolution + numPointsPerTurn;
+    PElementArray(bottomIdx, 1) = PElementArray(bottomIdx, 1) + 0.5 * PElementArrayTransverse;
+    PElementArray(topIdx,    1) = PElementArray(topIdx,    1) + 0.5 * PElementArrayTransverse;
 
-%V_local_element = MArray(1:numLinesAlongWire,1:numLinesAlongWire) * dIdt;
-% for n_index = 1:numLinesAlongWire
-%     %fun = @(x) abs(L_self(n_index).*dIdt(n_index) + u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IAbsArray(n_index) - x).*RNormalArray(n_index));
-%     %fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - (IArray(n_index) - x).*RNormalArray(n_index) - (IArraytrans2(n_index) - x).*RArraytrans2(n_index));
-%     fun = @(x) abs(u0_array(n_index).*(x./IcArray(n_index)).^n_value_array(n_index) - abs((IArray(n_index) - x).*RNormalArray(n_index)) - abs(VGroundVector(n_index)));
-% 
-%     x = fminsearch(fun,4000);
-% ISCArray(n_index,1) = x; %amount of current in superconductor for equal voltage [A]
-% end
+    %% --- External heater pulses ----------------------------------------
+    halfindex   = round(length(PElementArray) / 2);
+    [PElementArray, Pheatersave] = apply_heater_pulses( ...
+        PElementArray, halfindex, t, toffset, theater, PHeater);
 
-    INormalArray = IAbsArray - IcArray;               % Critical state model
-       % INormalArray = IAbsArray - ISCArray;               % Powerlaw
-    INormalArray = INormalArray.*(INormalArray > 0);  % Current element (I)  
-    VElementArray = INormalArray.*RNormalArray;       % Voltage element (V)
-    PElementArray = VElementArray.*IAbsArray;         % Heating power element (W = J/s)
-
-
-
-
-    IArrayTrans = IArray(numLinesAlongWire+1:end-1);
-    
-
-
-    
-    PElementArrayTransverse = IArrayTrans.^2.*axialshortResistance;
-
-
-    PElementArray(1:resolution:(numTransverse-1)*resolution,1) = PElementArray(1:resolution:(numTransverse-1)*resolution,1) + 0.5*PElementArrayTransverse; %half of heating to top
-    PElementArray(numPointsPerTurn+1:resolution:(numTransverse-1)*resolution+numPointsPerTurn,1) = PElementArray(numPointsPerTurn+1:resolution:(numTransverse-1)*resolution+numPointsPerTurn,1) + 0.5*PElementArrayTransverse; %half of heating to bottom
-
-
-    halfindex = round(length(PElementArray)/2);
-
-    % if  t < 1.6 %heating 2s
-    %    PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
-    % end
-
-    Pheatersave = 0;
-    if toffset(1) < t && t < toffset(1) + theater(1) %heating 2s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
-       Pheatersave = PHeater;
+    if t > simulation_time_limit
+        break;
     end
 
-
-
-    toffsettemp = toffset(1) + theater(1) + toffset(2);
-
-    if toffsettemp < t && t < toffsettemp + theater(2) %heating 5s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] Force heating
-       Pheatersave = PHeater;
-    end
-
-
-    toffsettemp = toffsettemp + theater(2) + toffset(3);
-
-    if toffsettemp < t && t < toffsettemp + theater(3) %heater 10s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-       Pheatersave = PHeater;
-    end
-
-    toffsettemp = toffsettemp + theater(3) + toffset(4);
-
-
-    if toffsettemp < t && t < toffsettemp + theater(4) %heating 15s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-       Pheatersave = PHeater;
-    end
-    toffsettemp = toffsettemp + theater(4) + toffset(5);
-
-    if toffsettemp < t && t < toffsettemp + theater(5) %heating 20s
-       PElementArray(halfindex,:) = PElementArray(halfindex,:) + PHeater/3; %[W] %heating 10s
-       Pheatersave = PHeater;
-    end
-
-
-
-    if t> 600
-        break
-    end
-
-
-    
-    
-
+    %% --- Thermal substep loop ------------------------------------------
+    temperatureCalculationStartTime = now * 86400;
     dtInt = 0;
-    
 
-    % ***** Longitudinal heat flow, inside current line *****
-    for temperatureIterationIndex = 1:temperatureSubSteps		
+    for temperatureIterationIndex = 1:temperatureSubSteps
+        % Right- and left-shifted neighbours for axial heat-flux stencil.
+        temperatureArrayRight = [temperatureArray(:, 2:numThermalSubdivisions), ...
+                                 temperatureArray(:, numThermalSubdivisions)];
+        temperatureArrayRight(1:numPoints-2, numThermalSubdivisions) = ...
+            temperatureArray(2:numPoints-1, 1);
 
-        temperatureArrayRight = [temperatureArray(:, 2:numThermalSubdivisions) temperatureArray(:, numThermalSubdivisions)]; %right boundary of cell
-        temperatureArrayRight(1:numPoints - 2, numThermalSubdivisions) = temperatureArray(2:numPoints-1, 1);				%now every element sees the element to the right	and the element point sees itself. There are more points than lines, so thats why there is -2 instead of -1 
+        thermalConductivityArrayRight = [thermalConductivityArray(:, 2:numThermalSubdivisions), ...
+                                         thermalConductivityArray(:, numThermalSubdivisions)];
+        thermalConductivityArrayRight(1:numPoints-2, numThermalSubdivisions) = ...
+            thermalConductivityArray(2:numPoints-1, 1);
 
-        thermalConductivityArrayRight = [thermalConductivityArray(:, 2:numThermalSubdivisions) thermalConductivityArray(:, numThermalSubdivisions)];
-        thermalConductivityArrayRight(1:numPoints - 2, numThermalSubdivisions) = thermalConductivityArray(2:numPoints-1, 1);		
+        temperatureArrayLeft = [temperatureArray(:, 1), ...
+                                temperatureArray(:, 1:numThermalSubdivisions-1)];
+        temperatureArrayLeft(2:numPoints-1, 1) = ...
+            temperatureArray(1:numPoints-2, numThermalSubdivisions);
 
-        temperatureArrayLeft = [temperatureArray(:, 1) temperatureArray(:, 1:numThermalSubdivisions - 1)];
-        temperatureArrayLeft(2:numPoints - 1, 1) = temperatureArray(1:numPoints - 2 ,numThermalSubdivisions);
+        thermalConductivityArrayLeft = [thermalConductivityArray(:, 1), ...
+                                        thermalConductivityArray(:, 1:numThermalSubdivisions-1)];
+        thermalConductivityArrayLeft(2:numPoints-1, 1) = ...
+            thermalConductivityArray(1:numPoints-2, numThermalSubdivisions);
 
-        thermalConductivityArrayLeft = [thermalConductivityArray(:, 1) thermalConductivityArray(:, 1:numThermalSubdivisions - 1)];
-        thermalConductivityArrayLeft(2:numPoints-1, 1) = thermalConductivityArray(1:numPoints - 2, numThermalSubdivisions);
+        % Top/bottom temperatures and conductivities of axial shorts.
+        temperatureBottomArray = temperatureArray(bottomIdx, 1);
+        temperatureTopArray    = temperatureArray(topIdx,    1);
+        thermalConductivityBottomArray = thermalConductivityArray(bottomIdx, 1);
+        thermalConductivityTopArray    = thermalConductivityArray(topIdx,    1);
 
+        % --- Axial conduction inside line element (right + left neighbour)
+        QElementArray_temp = (temperatureArrayRight - temperatureArray) .* 0.5 ...
+            .* (thermalConductivityArray + thermalConductivityArrayRight) ...
+            .* ACond ./ lenArrayAlongWireElements;
 
+        QElementArray_temp = QElementArray_temp + ...
+            (temperatureArrayLeft - temperatureArray) .* 0.5 ...
+            .* (thermalConductivityArray + thermalConductivityArrayLeft) ...
+            .* ACond ./ lenArrayAlongWireElements;
 
-        % temperatureBottomArray =  temperatureArray(1:resolution:numTransverse*resolution,round(size(temperatureArray,2)/2)); %temperature at bottom element of axial short
-        % temperatureTopArray = temperatureArray(numPointsPerTurn:resolution:(numTransverse-1)*resolution+numPointsPerTurn,round(size(temperatureArray,2)/2));
-        % 
-        % thermalConductivityBottomArray = thermalConductivityArray(1:resolution:numTransverse*resolution,round(size(temperatureArray,2)/2)); %thermal conductivity at bottom element of axial short. Take the middle 
-        % thermalConductivityTopArray = thermalConductivityArray(numPointsPerTurn:resolution:(numTransverse-1)*resolution+numPointsPerTurn,round(size(temperatureArray,2)/2));
+        % --- Heat flow through axial shorts
+        Qaxialarray = (temperatureTopArray - temperatureBottomArray) .* 0.5 ...
+            .* (thermalConductivityBottomArray + thermalConductivityTopArray) ...
+            .* thSlot .* thWallatShort ./ heightSlot;
 
-        temperatureBottomArray =  temperatureArray(1:resolution:(numTransverse-1)*resolution,1); %temperature at bottom element of axial short
-        temperatureTopArray = temperatureArray(numPointsPerTurn+1:resolution:(numTransverse-1)*resolution+numPointsPerTurn,1);
+        % --- Heat flow into the copper current leads
+        % Approximation: local Al thermal conductivity is the limiter; copper
+        % temperature is treated as uniform. Neglects Al/Cu contact resistance.
+        QringBottomarray = (temperatureArray(1:numPointsPerTurn, :) - temperatureRingBottom) ...
+            .* thermalConductivityArray(1:numPointsPerTurn, :) ...
+            .* lenArrayAlongWireElements(1:numPointsPerTurn, :) * thCond ./ (0.5 * wCond);
 
-        thermalConductivityBottomArray = thermalConductivityArray(1:resolution:(numTransverse-1)*resolution,1); %thermal conductivity at bottom element of axial short. Take the middle 
-        thermalConductivityTopArray = thermalConductivityArray(numPointsPerTurn+1:resolution:(numTransverse-1)*resolution+numPointsPerTurn,1);
+        QringToparray = (temperatureArray(end+1-numPointsPerTurn:end, :) - temperatureRingTop) ...
+            .* thermalConductivityArray(end+1-numPointsPerTurn:end, :) ...
+            .* lenArrayAlongWireElements(end+1-numPointsPerTurn:end, :) * thCond ./ (0.5 * wCond);
 
-% ***** Heat Flux ********
-        QElementArray_temp = (temperatureArrayRight - temperatureArray).*0.5 ... 
-            .*(thermalConductivityArray + thermalConductivityArrayRight).*ACond./lenArrayAlongWireElements; %each element sees the element to the right of it and the boundary sees itself. 
-        
-        QElementArray_temp = QElementArray_temp + (temperatureArrayLeft - temperatureArray).*0.5 ... 
-            .*(thermalConductivityArray + thermalConductivityArrayLeft).*ACond./lenArrayAlongWireElements; %each element sees the element to the left of it and the boundary sees itself. 
-
-
-
-        Qaxialarray = (temperatureTopArray - temperatureBottomArray) .* 0.5.* (thermalConductivityBottomArray + thermalConductivityTopArray).*thSlot.*thWallatShort./heightSlot;
-
-        QringBottomarray = (temperatureArray(1:numPointsPerTurn,:) - temperatureRingBottom).*(thermalConductivityArray(1:numPointsPerTurn,:)).*lenArrayAlongWireElements(1:numPointsPerTurn,:)*thCond./(0.5.*wCond); %approximation that local thermal conductivity of aluminium is limiting the heat flow to copper and that copper stays at constant temperature. Also, the thermal conductivity is calculated as the conductivity as if the heat would travel axially through an aluminium thickness of half a turn. Contact resistance to copper is neglected.
-
-        QringToparray = (temperatureArray(end+1-numPointsPerTurn:end,:) - temperatureRingTop).*(thermalConductivityArray(end+1-numPointsPerTurn:end,:)).*lenArrayAlongWireElements(end+1-numPointsPerTurn:end,:)*thCond./(0.5.*wCond);
-
-        Qheliumcoolingarray(:,:) = 0;
+        % --- Helium gas convective cooling
+        Qheliumcoolingarray = zeros(size(temperatureArray));
         if Helium_cooling == 1
-            k_heliumarray = k_helium*ones(size(temperatureArray,1),size(temperatureArray,2)); %helium temperature constant
-
-            h_helium_array = Nu*k_heliumarray./L_helium; %solving heat transfer coefficient from Nusselt number
-
-            R_thermal = 0.5*thCond./(thermalConductivityArray)+1./h_helium_array; %Thermal resistance, including heat conductivity
-
-            Qheliumcoolingarray = 2.*cooling_area_correction_factor*A_helium.*(temperatureArray-temperature_helium)./R_thermal; %(area from 2 sides)
-
-
-
-
+            k_heliumarray  = k_helium * ones(size(temperatureArray));
+            h_helium_array = Nu * k_heliumarray ./ L_helium;
+            R_thermal      = 0.5 * thCond ./ thermalConductivityArray + 1 ./ h_helium_array;
+            Qheliumcoolingarray = 2 .* cooling_area_correction_factor .* A_helium ...
+                                  .* (temperatureArray - temperature_helium) ./ R_thermal;
         end
 
+        % --- Add heat flow from axial shorts (sign convention: + into bottom, - from top)
+        QElementArray_temp(bottomIdx, 1) = QElementArray_temp(bottomIdx, 1) + Qaxialarray;
+        QElementArray_temp(topIdx,    1) = QElementArray_temp(topIdx,    1) - Qaxialarray;
 
-        % 
-        % QElementArray_temp(1:resolution:numTransverse*resolution,round(size(temperatureArray,2)/2)) = QElementArray_temp(1:resolution:numTransverse*resolution,round(size(temperatureArray,2)/2)) + Qaxialarray; %add heat flow for bottom part sign convention 
-        % QElementArray_temp(numPointsPerTurn:resolution:(numTransverse-1)*resolution+numPointsPerTurn,round(size(temperatureArray,2)/2)) = QElementArray_temp(numPointsPerTurn:resolution:(numTransverse-1)*resolution+numPointsPerTurn,round(size(temperatureArray,2)/2)) - Qaxialarray; %add heat flow for bottom part sign convention 
-
-        
-        QElementArray_temp(1:resolution:(numTransverse-1)*resolution,1) = QElementArray_temp(1:resolution:(numTransverse-1)*resolution,1) + Qaxialarray; %add heat flow for bottom part sign convention 
-        QElementArray_temp(numPointsPerTurn+1:resolution:(numTransverse-1)*resolution+numPointsPerTurn,1) = QElementArray_temp(numPointsPerTurn+1:resolution:(numTransverse-1)*resolution+numPointsPerTurn,1) - Qaxialarray; %add heat flow for bottom part sign convention 
-
-        
-
+        % --- Add heat flow into copper rings
         if copper_heat == 1
-%%%Add copper at the bottom
-        QElementArray_temp(1:numPointsPerTurn,:) = QElementArray_temp(1:numPointsPerTurn,:) -QringBottomarray; % - since QringBottomarray is + if temperature of ring smaller than temperature of cylinder
-
-%%%Add copper at the top
-        QElementArray_temp(end+1-numPointsPerTurn:end,:) = QElementArray_temp(end+1-numPointsPerTurn:end,:) - QringToparray; % - since QringToparray is + if temperature of ring smaller than temperature of cylinder
-
+            QElementArray_temp(1:numPointsPerTurn, :) = ...
+                QElementArray_temp(1:numPointsPerTurn, :) - QringBottomarray;
+            QElementArray_temp(end+1-numPointsPerTurn:end, :) = ...
+                QElementArray_temp(end+1-numPointsPerTurn:end, :) - QringToparray;
         end
-
 
         QElementArray = QElementArray_temp - Qheliumcoolingarray;
 
-        %dTdtElementArray = (PElementArray + QElementArray)./(heatCapacityArray.*volumeArray); Wrong IMO, since       %heat capacity already includes volume
-        dTdtElementArray = (PElementArray + QElementArray)./(heatCapacityArray); 
-        dtLocal = dTMax./max(max(abs(dTdtElementArray)))/temperatureSubSteps;
-        
+        % NOTE: heat-capacity is already mass*cp (volume incorporated upstream),
+        % so we divide by heatCapacityArray (not heatCapacityArray.*volumeArray).
+        dTdtElementArray = (PElementArray + QElementArray) ./ heatCapacityArray;
 
-        heatCapacityCoppertop = CpCu_nist(temperatureRingTop,massRing);
-         heatCapacityCopperbottom = CpCu_nist(temperatureRingBottom,massRing);
+        dTdtMax = max(max(abs(dTdtElementArray)));
+        dtLocal = dTMax ./ dTdtMax / temperatureSubSteps;
 
-        dTdtCoppertop = sum(sum(QringToparray))/heatCapacityCoppertop;
-        dTdtCopperBottom = sum(sum(QringBottomarray))/heatCapacityCopperbottom;
-
-
-        if max(max(abs(dTdtElementArray)))/temperatureSubSteps == 0
-            disp('divide by 0')
+        if dTdtMax / temperatureSubSteps == 0
+            warning('main_5turnMM:zero_dTdt', ...
+                'dT/dt is zero everywhere; thermal substep timestep is undefined.');
         end
 
-        %nancheck(iterationIndex,temperatureIterationIndex) = dtLocal ;%bugfixing
-        dtInt = dtInt + dtLocal;
-        %dtIntarray(iterationIndex,temperatureIterationIndex) = dtInt; %bugfixing
-        temperatureArray = temperatureArray + dtLocal*dTdtElementArray;
-        temperatureRingBottom = temperatureRingBottom +dtLocal*dTdtCopperBottom;
-        temperatureRingTop = temperatureRingTop + dtLocal*dTdtCoppertop;
+        heatCapacityCoppertop    = CpCu_nist(temperatureRingTop,    massRing);
+        heatCapacityCopperbottom = CpCu_nist(temperatureRingBottom, massRing);
+        dTdtCoppertop    = sum(sum(QringToparray))    / heatCapacityCoppertop;
+        dTdtCopperBottom = sum(sum(QringBottomarray)) / heatCapacityCopperbottom;
 
+        dtInt                 = dtInt + dtLocal;
+        temperatureArray      = temperatureArray + dtLocal * dTdtElementArray;
+        temperatureRingBottom = temperatureRingBottom + dtLocal * dTdtCopperBottom;
+        temperatureRingTop    = temperatureRingTop    + dtLocal * dTdtCoppertop;
     end
-    temperatureArraystored(:,:,iterationIndex) = temperatureArray;
+
+    temperatureArraystored(:, :, iterationIndex) = temperatureArray;
     dt = dtInt;
+    temperatureRingTophistory(iterationIndex)    = temperatureRingTop;
+    temperatureRingBottomhistory(iterationIndex) = temperatureRingBottom;
+    temperaturemax(iterationIndex)               = max(temperatureArray(:));
 
-    temperatureRingTophistory(:,iterationIndex) =   temperatureRingTop;
-    temperatureRingBottomhistory(:,iterationIndex) = temperatureRingBottom;
-    temperaturemax(iterationIndex) = max(temperatureArray(:));
-    
-	
-	% Temperature part stops here and ODE part starts
-	temperatureCalculationFinishTime = now*24*3600;
-	%disp(sprintf("Temperature calculation time: %0.3f s", temperatureCalculationFinishTime-temperatureCalculationStartTime));   
-	ODECalculationStartTime = now*24*3600;
-	
-	
+    temperatureCalculationFinishTime = now * 86400;
+    ODECalculationStartTime          = now * 86400;
 
-    % Construction of vector b in Av = b
-    % The vector comprises all dI/dt followed by all voltage points, excluding
-    % point 1, which is per definition always at 0 V. 
-    
-    s.RArrayTrans = RArrayTrans;
-    s.IcArray = IcArray;   %critical current of superconductor
-    %s.ISCArray = ISCArray;  %current in superocnductor
-    s.externalVoltagedIdtVector = s.externalVoltagedIdtVector;
-    s.bVector = [];
-    s.VGroundVector = [];
-    s.numLines = numLines;
-    s.numLinesAlongWire = numLinesAlongWire;
-    s.numTransverse = numTransverse;
-    s.numPoints = numPoints;
-    s.lenArrayAlongWire = lenArrayAlongWire;
-    s.signArray = zeros(numLinesAlongWire, 1);
-    s.INormalArray = zeros(numLinesAlongWire, 1);
-    s.RNormalArray = RNormalArray;
+    %% --- ODE for current redistribution --------------------------------
+    s.RArrayTrans            = RArrayTrans;
+    s.IcArray                = IcArray;
+    s.bVector                = [];
+    s.VGroundVector          = [];
+    s.numLines               = numLines;
+    s.numLinesAlongWire      = numLinesAlongWire;
+    s.numTransverse          = numTransverse;
+    s.numPoints              = numPoints;
+    s.lenArrayAlongWire      = lenArrayAlongWire;
+    s.signArray              = zeros(numLinesAlongWire, 1);
+    s.INormalArray           = zeros(numLinesAlongWire, 1);
+    s.RNormalArray           = RNormalArray;
     s.numThermalSubdivisions = numThermalSubdivisions;
 
     IArray0 = IArray;
+    tspan   = [t, t + dt];
+    myfun   = @(tt, II) myODE(tt, II, s);
+    [tArchive, IArrayArchive] = ode15s(myfun, tspan, IArray0);
+    t       = tArchive(end);
+    IArray  = IArrayArchive(end, :)';
 
-    tspan = [t, (t + dt)];      
-    
-    myfun = @(t, IArray)myODE(t, IArray, s); 
-    % [tArchive, IArrayArchive] = ode23tb(myfun, tspan, IArray0); % Function ode23tb solves stiff differential equations, low order method 
- %   [tArchive, IArrayArchive] = ode23s(myfun, tspan, IArray0); %GOOD ONE
-        [tArchive, IArrayArchive] = ode15s(myfun, tspan, IArray0); %GOOD ONE
+    tArrayhistory(iterationIndex)    = t;
+    IArrayhistory(:, iterationIndex) = IArray;
+    VGroundVector                    = myODEVoltages(t, IArray, s);
 
-    %[tArchive, IArrayArchive] = ode89(myfun, tspan, IArray0); 
-    t = tArchive(length(tArchive));
-    IArray = IArrayArchive(length(tArchive), :)';        
+    Qheliumcoolingarrayhistory(:, :, iterationIndex) = Qheliumcoolingarray;
+    VGroundVectorhistory(:, iterationIndex)          = VGroundVector;
 
+    % E-field probe between 1/10 and 9/10 voltage taps.
+    idxLow  = round(length(VGroundVector) * 1/10);
+    idxHigh = round(length(VGroundVector) * 9/10);
+    Efield(iterationIndex) = 1e6 * (VGroundVector(idxLow) - VGroundVector(idxHigh)) ...
+                             / EfieldArcLength;
 
-    tArrayhistory(iterationIndex) = t;
-    IArrayhistory(:,iterationIndex) = IArray;
-    VGroundVector = myODEVoltages(t, IArray, s);
-    % V_local_element = diff(VGroundVector);
-    % V_local_element(end+1) = 0;
+    ODECalculationFinishTime = now * 86400;
 
+    %% --- Field-map update + visualisation ------------------------------
+    plottingStartTime = now * 86400;
 
-    Qheliumcoolingarrayhistory(:,:,iterationIndex) = Qheliumcoolingarray;
-    VGroundVectorhistory(:,iterationIndex) = VGroundVector;
-    Efield(iterationIndex) = 1e6*(VGroundVector(round(length(VGroundVector)*1/10))-VGroundVector(round(length(VGroundVector)*9/10)))./(4*2*pi*0.12); % Be very careful with these variables
+    BLocalXArray = BiotSavartMatrixX * IArray;
+    BLocalYArray = BiotSavartMatrixY * IArray;
+    BLocalZArray = BiotSavartMatrixZ * IArray;
 
-    % ODE part finishes here and plotting part starts
-	ODECalculationFinishTime = now*24*3600;	
-	%disp(sprintf("ODE calculation time: %0.3f s", ODECalculationFinishTime-ODECalculationStartTime));   
-	
-	
-	plottingStartTime = now*24*3600;
+    if mod(iterationIndex + 1, drawFigureAtIteration) == 0
+        centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, ...
+            numTransverse, numThermalSubdivisions, xPlot, yPlot, zPlot, ...
+            x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+            BLocalXArray, BLocalYArray, BLocalZArray, ...
+            temperatureArray, mutualInductanceSpaceRatio, IArray);
+        title(sprintf('Iteration = %0.0f, t = %0.3g s, I_{ext} = %0.2f A', ...
+            iterationIndex, t, IExt));
+        pause(0.1);
 
-    % Local magnetic flux density (T)
-    BLocalXArray = BiotSavartMatrixX*IArray; 
-    BLocalYArray = BiotSavartMatrixY*IArray; 
-    BLocalZArray = BiotSavartMatrixZ*IArray; 
-
-    if(mod(iterationIndex+1,drawFigureAtIteration) == 0)
-        
-        centerB = drawFieldMap(RSol, len, numPoints, numLines, numLinesAlongWire, numTransverse,numThermalSubdivisions, xPlot, yPlot, zPlot, ... 
-            x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, BLocalXArray, BLocalYArray, BLocalZArray, ... 
-            temperatureArray, mutualInductanceSpaceRatio, IArray); 
-        title(sprintf('Iteration = %0.0f, t = %0.3g s, I_{ext} = %0.2f A', iterationIndex, t, IExt));
-        pause(0.1) 
-        figure(1);
-        hold on
-
-        if writevideo ==1
-        frame = getframe(gcf);
-        writeVideo(v,frame);
+        if writevideo == 1
+            figure(1); hold on;
+            frame = getframe(gcf);
+            writeVideo(v, frame);
+            hold off;
         end
 
-        hold off
-            centerBhistory(iterationIndex) = centerB;
-    figure(2)
-    plot(tArrayhistory(centerBhistory>0),centerBhistory(centerBhistory>0),Color='b',Marker='.',MarkerSize=10,LineStyle='-')
-    xlabel('t [s]')
-    ylabel('B_{center} [T]')
-    grid on
+        centerBhistory(iterationIndex) = centerB;
+        figure(2);
+        plot(tArrayhistory(centerBhistory > 0), centerBhistory(centerBhistory > 0), ...
+            Color='b', Marker='.', MarkerSize=10, LineStyle='-');
+        xlabel('t [s]'); ylabel('B_{center} [T]'); grid on;
 
-    figure(3)
-    plot(tArrayhistory,Efield,Color='b',Marker='.',MarkerSize=10,LineStyle='-')
-    xlabel('t [s]')
-    ylabel('E_{field} [\muV/m]')
-    grid on
-    end 
-    
-    
-
-    %dIdt = myODE(t, IArray, s);
-	
-	% Plotting part finishes here
-	plottingFinishTime = now*24*3600;	
-	%disp(sprintf("Plotting time: %0.3f s", plottingFinishTime-plottingStartTime));   
-	overallFinishTime = now*24*3600;
-	%disp(sprintf("Overall time: %0.3f s", overallFinishTime-overallStartTime));   
-	
-	
-	    %Calculate fraction of time spent in each operation
-    fracMatCalc = 100*(materialsPropsCalculationFinishTime - materialsPropsCalculationStartTime)./(overallFinishTime - overallStartTime); 
-	fracTSteps = 100*(temperatureCalculationFinishTime - temperatureCalculationStartTime)./(overallFinishTime - overallStartTime);
-	fracODE = 100*(ODECalculationFinishTime - ODECalculationStartTime)./(overallFinishTime - overallStartTime); 
-	fracPlotting = 100*(plottingFinishTime - plottingStartTime)./(overallFinishTime - overallStartTime);    
-    
-
-    disp(sprintf("Index: %0.0f, time expired: %0.1f s, tsim %0.6g s, last iteration %0.1f s (%0.3f%% in material calc, %0.3f%% in TSteps, %0.3f%% in ODE, %0.3f%% plotting)",iterationIndex, overallFinishTime-overallFirstStartTime, t, overallFinishTime-overallStartTime, fracMatCalc, fracTSteps, fracODE, fracPlotting));   
-
-    
-    if writedata ==1
-    fprintf(fileID,'%0.6g, %0.6f, %0.3f, %0.3f, %0.3f, %0.6f,  %0.4f \n',[tArrayhistory(1,end) centerB Pheatersave temperatureRingTop temperatureRingBottom Efield(1,end) temperaturemax(1,end)]);
+        figure(3);
+        plot(tArrayhistory, Efield, Color='b', Marker='.', MarkerSize=10, LineStyle='-');
+        xlabel('t [s]'); ylabel('E_{field} [\muV/m]'); grid on;
     end
-	
 
-end 
+    plottingFinishTime = now * 86400;
+    overallFinishTime  = now * 86400;
 
-if writedata ==1
-fclose(fileID);
+    %% --- Per-iteration timing report -----------------------------------
+    deltaTotal  = max(overallFinishTime - overallStartTime, eps);
+    fracMatCalc = 100 * (materialsPropsCalculationFinishTime - materialsPropsCalculationStartTime) / deltaTotal;
+    fracTSteps  = 100 * (temperatureCalculationFinishTime  - temperatureCalculationStartTime)  / deltaTotal;
+    fracODE     = 100 * (ODECalculationFinishTime - ODECalculationStartTime) / deltaTotal;
+    fracPlot    = 100 * (plottingFinishTime       - plottingStartTime)       / deltaTotal;
+
+    fprintf(['Index: %0.0f, time expired: %0.1f s, tsim %0.6g s, ', ...
+             'last iteration %0.1f s ', ...
+             '(%0.2f%% mat, %0.2f%% TSteps, %0.2f%% ODE, %0.2f%% plot)\n'], ...
+        iterationIndex, overallFinishTime - overallFirstStartTime, t, ...
+        deltaTotal, fracMatCalc, fracTSteps, fracODE, fracPlot);
+
+    if writedata == 1
+        fprintf(fileID, '%0.6g, %0.6f, %0.3f, %0.3f, %0.3f, %0.6f, %0.4f \n', ...
+            [tArrayhistory(end), centerB, Pheatersave, ...
+             temperatureRingTop, temperatureRingBottom, Efield(end), ...
+             temperaturemax(end)]);
+    end
 end
 
-if writevideo ==1
-close(v);
+%% ===================== CLEANUP / FINAL SAVE ==============================
+if writedata == 1 && fileID > 0
+    fclose(fileID);
 end
-save(append(Description,string(datetime('now','TimeZone','local','Format','d-MMM-y')),'_',string(datetime('now','TimeZone','local','Format','HH.mm.ss')),'.mat'))
-toc       
-    
+if writevideo == 1 && ~isempty(v)
+    close(v);
+end
+
+savename = append(Description, ...
+    string(datetime('now', 'TimeZone', 'local', 'Format', 'd-MMM-y')), '_', ...
+    string(datetime('now', 'TimeZone', 'local', 'Format', 'HH.mm.ss')), '.mat');
+save(savename);   % TODO: parameterize output directory
+
+toc;
+
+%% ===================== LOCAL FUNCTIONS ===================================
+
+function [PElementArray, Pheatersave] = apply_heater_pulses( ...
+        PElementArray, halfindex, t, toffset, theater, PHeater)
+    % APPLY_HEATER_PULSES Add forced heater power to the central element
+    % during each scheduled pulse window. Pulse k is active during the
+    % interval [tStart_k, tStart_k + theater(k)], where tStart_k is the
+    % cumulative offset built from toffset/theater (see definition below).
+    Pheatersave = 0;
+
+    pulseStarts    = zeros(1, numel(theater));
+    pulseStarts(1) = toffset(1);
+    for k = 2:numel(theater)
+        pulseStarts(k) = pulseStarts(k-1) + theater(k-1) + toffset(k);
+    end
+
+    for k = 1:numel(theater)
+        if pulseStarts(k) < t && t < pulseStarts(k) + theater(k)
+            % Heater power is split across all numThermalSubdivisions of the
+            % central line element. The "/3" assumes numThermalSubdivisions==3.
+            PElementArray(halfindex, :) = PElementArray(halfindex, :) + PHeater / 3;
+            Pheatersave = PHeater;
+            return;
+        end
+    end
+end
+
+function write_log_header(fileID, I0, RSol, numWindings, N_shorts, resolution, ...
+        thCond, HTStapeName, N_tapes, initial_temperature, PHeater, theater, ...
+        dTMax, temperatureSubSteps, Helium_cooling, copper_heat, copper_conduction)
+    % WRITE_LOG_HEADER Emit a fixed-format header to the run log.
+    fprintf(fileID, 'Input Parameters RePISoSi code:\n\n');
+    fprintf(fileID, 'Initial Current: %.0f [A]\n',                       I0);
+    fprintf(fileID, 'Radius solenoid: %.3f [m]\n',                       RSol);
+    fprintf(fileID, 'Number of turns: %.1g [-]\n',                       numWindings);
+    fprintf(fileID, 'Number of shorts per turn: %.2g [-]\n',             N_shorts);
+    fprintf(fileID, 'Number of line-elements between axial shorts: %.1g [-]\n', resolution);
+    fprintf(fileID, 'Thickness of stabiliser wall: %.2g [mm]\n',         1e3*thCond);
+    fprintf(fileID, 'Tape type: %s\n',                                   HTStapeName);
+    fprintf(fileID, 'Number of tapes [-]: %.1g\n',                       N_tapes);
+    fprintf(fileID, 'Initial temperature [K]: %.1f\n',                   initial_temperature);
+    fprintf(fileID, 'Power of Heater [W]: %.1f\n',                       PHeater);
+    fprintf(fileID, 'Heating time [s]: %.1f\n',                          theater);
+    fprintf(fileID, 'deltaTmax (timestep determination) [K]: %.1f\n',    dTMax);
+    fprintf(fileID, 'temperatureSubSteps [-]: %.1f\n',                   temperatureSubSteps);
+    fprintf(fileID, 'Status Helium convection cooling (1=on,0=off): %.1g\n',     Helium_cooling);
+    fprintf(fileID, 'Status Copper heat conduction cooling (1=on,0=off): %.1g\n', copper_heat);
+    fprintf(fileID, 'Status Copper conductivitiy (1=on,0=off): %.1g\n\n\n',       copper_conduction);
+    fprintf(fileID, 'time [s], centerB [T], Pheater [W], TringTop [K], TringBottom [K], Efield [uV/m], Tmax [K]\n');
+end

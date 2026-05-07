@@ -1,7 +1,19 @@
-% Reference: 
-%   LNG Materials and Fluids. Ed. Douglas Mann National Bureau of Standards,
-%   Cryogenics Division First Edition, 1977. 
-
+% -------------------------------------------------------------------------
+%  heat_capacity_al_alloy_5083.m  --  Specific heat capacity of Al-5083
+%                                     fitted to NBS cryogenic data.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Reference:
+%      LNG Materials and Fluids. Ed. Douglas Mann, National Bureau of
+%      Standards, Cryogenics Division, First Edition, 1977.
+%
+%  C  = heat_capacity_al_alloy_5083(T, volume) returns the heat capacity
+%      (J/K) for each entry of T (K), with the corresponding volume (m^3).
+%      Returns NaN for T < 4 K or T > 300 K (outside the fit range).
+% -------------------------------------------------------------------------
 function [C] = heat_capacity_al_alloy_5083(T, volume)
 
     rho = 2650; % Density of Al 5083 (kg/m^3)

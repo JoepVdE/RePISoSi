@@ -1,7 +1,21 @@
-function [MArray, LTotal] = generate_inductance_matrix(numLines, numLinesAlongWire, wCond, thCond, ... 
-    x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ... 
-    mutualInductanceSpaceRatio, mutualInductanceSpaceRatioLimit, ignoreMutualInductancesTransverseElements) 
-    mu0 = pi*4E-7; %[H/m]
+% -------------------------------------------------------------------------
+%  generate_inductance_matrix.m  --  Build the full self/mutual inductance
+%                                    matrix for the line-element mesh.
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Self-inductance terms come from calcSelfInductanceRectangularBar.m
+%  (Piatek et al. 2012). Mutual terms use the Neumann formula with uniform
+%  sub-segmenting whenever the centre-to-centre distance is smaller than
+%  mutualInductanceSpaceRatio * (avg element length).
+% -------------------------------------------------------------------------
+function [MArray, LTotal] = generate_inductance_matrix(numLines, numLinesAlongWire, ...
+    wCond, thCond, x1Array, x2Array, y1Array, y2Array, z1Array, z2Array, ...
+    mutualInductanceSpaceRatio, mutualInductanceSpaceRatioLimit, ...
+    ignoreMutualInductancesTransverseElements)
+    mu0 = pi * 4e-7;   % H/m
 
 
     xMidArray = 0.5*(x1Array + x2Array);

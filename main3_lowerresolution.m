@@ -1,3 +1,12 @@
+% =========================================================================
+%  *** LEGACY / HISTORICAL VARIANT ***  --  main3_lowerresolution.m
+%
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%
+%  Lower-resolution exploration variant of the quench-analysis driver,
+%  retained for reproducibility. The canonical entry point for new work
+%  is `main_5turnMM.m`.
+% =========================================================================
 % ***** Quench analysis of partially insulated coil *****
 % 
 %
@@ -6,7 +15,7 @@
 % *****
 
 
-clear all; close all; clc; 
+clear; close all; clc; 
 
 set(0, 'defaultTextFontName', 'times', 'defaultTextFontSize', 14);
 set(0, 'defaultAxesFontName', 'times', 'defaultAxesFontSize', 14);

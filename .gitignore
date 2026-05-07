@@ -1,0 +1,27 @@
+# MATLAB autosave / build artefacts
+*.asv
+*.autosave
+*.m~
+slprj/
+sccprj/
+*.slxc
+octave-workspace
+
+# MATLAB-generated output (keep small CSV inputs, ignore simulation outputs)
+*.mat
+*.mp4
+*.avi
+*.fig
+
+# Curve Fitting Toolbox session files (regenerable)
+*.sfit
+
+# Auto-generated runtime log files (timestamped txt outputs from main scripts)
+*_*-*-2*_*.*.*.txt
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+desktop.ini

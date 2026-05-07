@@ -1,8 +1,20 @@
-function [xArray, yArray, zArray] = generate_line_elements(numPoints, numPointsPerTurn, RSolEff, numWindings, wCond) 
-    % Generate line elements for solenoid 
-    xArray = zeros(numPoints, 1); % Initialize points in x-axis
-    yArray = zeros(numPoints, 1); % Initialize points in y-axis
-    zArray = zeros(numPoints, 1); % Initialize points in z-axis 
+% -------------------------------------------------------------------------
+%  generate_line_elements.m  --  Generate the 3-D points of a uniform
+%                                helical solenoid (cylindrical -> Cartesian).
+%  Part of RePISoSi - https://github.com/JoepVdE/RePISoSi  -  License: MIT
+%  Author : J.L. Van den Eijnden, 2026
+%           Original implementation by M. Mentink (Oct. 2022),
+%           extended by J.L. Van den Eijnden and A. Vaskuri (Oct. 2023).
+%
+%  Inputs : numPoints, numPointsPerTurn, RSolEff (effective radius, m),
+%           numWindings, wCond (conductor width = pitch per turn, m).
+%  Outputs: xArray, yArray, zArray  -- column vectors of Cartesian coords.
+% -------------------------------------------------------------------------
+function [xArray, yArray, zArray] = generate_line_elements(numPoints, ...
+        numPointsPerTurn, RSolEff, numWindings, wCond)
+    xArray = zeros(numPoints, 1);
+    yArray = zeros(numPoints, 1);
+    zArray = zeros(numPoints, 1);
 
     len = numWindings*wCond; 
     dzdp = len/(numPointsPerTurn*numWindings); % dz along z-axis of the solenoid 
