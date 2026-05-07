@@ -77,7 +77,7 @@ Outputs:
 
 ### Minimal smoke test
 
-To verify your install without running the full quench (which can take hours), reduce `maxIteration` to e.g. 20 and `numWindings`/`N_shorts` to small integers in `main_5turnMM.m`.
+To verify your install without running the full quench, reduce `maxIteration` to e.g. 20 and `numWindings`/`N_shorts` to small integers in `main_5turnMM.m`.
 
 ## Known issues / things to fix before extending
 
