@@ -75,9 +75,6 @@ Outputs:
 - Optional `<Description><timestamp>.txt` log with `[time, centerB, Pheater, T_topRing, T_bottomRing, Efield, Tmax]` per row.
 - A final `<Description><timestamp>.mat` workspace dump for post-processing with `makeplots.m` / `plotBET.m`.
 
-### Minimal smoke test
-
-To verify your install without running the full quench, reduce `maxIteration` to e.g. 20 and `numWindings`/`N_shorts` to small integers in `main_5turnMM.m`.
 
 ## Known issues / things to fix before extending
 
@@ -89,8 +86,8 @@ To verify your install without running the full quench, reduce `maxIteration` to
 
 ## Citing
 
-If you use this code in academic work, please cite via [`CITATION.cff`](CITATION.cff). The model and validation data are described in J.L. Van den Eijnden's MSc thesis (TU Delft / CERN, 2023).
+If you use this code in academic work, please cite via [`CITATION.cff`](CITATION.cff). The model and validation data are described in J.L. Van den Eijnden's MSc thesis (TU Eindhoven / CERN, 2023).
 
 ## License
 
-[MIT](LICENSE) © 2026 J.L. Van den Eijnden, with original contributions by M. Mentink and A. Vaskuri.
+[MIT](LICENSE) © 2026 J.L. Van den Eijnden,  A. Vaskuri and M. Mentink.
