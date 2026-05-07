@@ -86,7 +86,7 @@ Outputs:
 
 ## Citing
 
-If you use this code in academic work, please cite via [`CITATION.cff`](CITATION.cff). The model and validation data are described in J.L. Van den Eijnden's MSc thesis (TU Eindhoven / CERN, 2023).
+If you use this code in academic work, please cite via [`CITATION.cff`](CITATION.cff). The model and validation data are described in J.L. Van den Eijnden's MSc thesis (TU Eindhoven / CERN, 2023). https://research.tue.nl/en/studentTheses/two-self-protected-hts-demonstration-coils-for-particle-detectors/
 
 ## License
 
